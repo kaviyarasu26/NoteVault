@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#080b12">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="NoteVault">
+<title>NoteVault</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap');
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --bg:#080b12;--s1:#0d1120;--s2:#131828;--s3:#1a2035;
+  --border:#1e2540;--border2:#2a3560;
+  --acc:#3d6bff;--acc2:#6d8fff;--acc-glow:#3d6bff30;
+  --text:#d4daf5;--t2:#7a85b0;--t3:#3a4570;
+  --green:#2dd4a0;--red:#f06080;--orange:#f0a040;--yellow:#e0d060;
+  --mono:'IBM Plex Mono',monospace;--sans:'IBM Plex Sans',sans-serif;
+  --r:12px;--safe-b:env(safe-area-inset-bottom,0px);
+}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--sans);overflow:hidden;-webkit-tap-highlight-color:transparent;overscroll-behavior:none;}
+#app{display:flex;flex-direction:column;height:100vh;height:100dvh;}
+.screen{display:none;flex:1;flex-direction:column;overflow:hidden;}
+.screen.active{display:flex;}
+.hdr{display:flex;align-items:center;padding:0 14px;background:var(--bg);border-bottom:1px solid var(--border);flex-shrink:0;height:52px;gap:8px;}
+.hdr-logo{font-family:var(--mono);font-size:15px;font-weight:600;color:var(--text);display:flex;align-items:center;gap:8px;}
+.logo-dot{width:8px;height:8px;border-radius:50%;background:var(--acc);box-shadow:0 0 8px var(--acc);animation:pulse 2.5s infinite;}
+.hdr-title{font-family:var(--mono);font-size:14px;font-weight:500;color:var(--text);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.icon-btn{width:38px;height:38px;display:flex;align-items:center;justify-content:center;border-radius:9px;border:none;background:transparent;color:var(--t2);cursor:pointer;font-size:18px;flex-shrink:0;transition:background .12s,color .12s;}
+.icon-btn:active,.icon-btn:hover{background:var(--s3);color:var(--text);}
+#bnav{display:flex;background:var(--s1);border-top:1px solid var(--border);padding-bottom:var(--safe-b);flex-shrink:0;}
+.bnav-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:8px 4px;border:none;background:transparent;color:var(--t3);cursor:pointer;font-size:9px;font-family:var(--mono);text-transform:uppercase;letter-spacing:.08em;transition:color .15s;min-height:52px;position:relative;}
+.bnav-item svg{width:20px;height:20px;stroke-width:1.6;}
+.bnav-item.active{color:var(--acc2);}
+.bnav-item.active svg{stroke:var(--acc2);}
+.nb-badge{position:absolute;top:6px;right:calc(50% - 14px);background:var(--acc);color:#fff;font-size:9px;font-family:var(--mono);padding:1px 5px;border-radius:6px;min-width:16px;text-align:center;border:2px solid var(--bg);}
+.scroll{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;}
+::-webkit-scrollbar{width:3px;}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
+.fab{position:fixed;bottom:calc(62px + var(--safe-b));right:16px;width:52px;height:52px;border-radius:14px;background:var(--acc);border:none;color:#fff;font-size:26px;cursor:pointer;box-shadow:0 4px 24px var(--acc-glow);display:flex;align-items:center;justify-content:center;transition:transform .1s;z-index:50;}
+.fab:active{transform:scale(.92);}
+.doc-card{margin:8px 12px 0;background:var(--s1);border:1px solid var(--border);border-radius:var(--r);padding:14px 15px;cursor:pointer;transition:border-color .15s,background .12s;}
+.doc-card:hover,.doc-card:active{background:var(--s2);border-color:var(--border2);}
+.dc-title{font-family:var(--mono);font-size:14px;font-weight:600;color:var(--text);margin-bottom:7px;}
+.dc-meta{font-size:11px;color:var(--t3);font-family:var(--mono);display:flex;gap:12px;flex-wrap:wrap;align-items:center;}
+.dc-due{color:var(--acc2);font-weight:600;}
+.item-row{display:flex;align-items:flex-start;position:relative;}
+.item-bullet{width:24px;height:40px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.bdot{background:var(--acc);flex-shrink:0;border-radius:2px;width:7px;height:7px;}
+.bdot.child{border-radius:50%;background:var(--border2);width:5px;height:5px;}
+.item-ta{flex:1;background:transparent;border:none;outline:none;color:var(--text);font-size:14px;font-family:var(--sans);line-height:1.65;padding:10px 4px 10px 0;resize:none;overflow:hidden;min-height:40px;}
+.item-ta.fc{color:#9ab0ff;}
+.item-ta::placeholder{color:var(--t3);}
+.fc-badge{font-size:10px;padding:2px 7px;border-radius:5px;margin:13px 8px 0 0;white-space:nowrap;flex-shrink:0;font-family:var(--mono);}
+.fc-due{background:#0d1a3a;color:var(--acc2);border:1px solid #2a3a7e;}
+.fc-sched{background:#0d1a1a;color:var(--green);border:1px solid #1a3a2a;}
+.fc-new{background:#1a1a0d;color:var(--yellow);border:1px solid #3a3a1a;}
+#ftoolbar{display:none;position:fixed;bottom:0;left:0;right:0;background:var(--s2);border-top:1px solid var(--border);padding:7px 10px calc(7px + var(--safe-b));z-index:100;flex-wrap:nowrap;overflow-x:auto;gap:6px;-webkit-overflow-scrolling:touch;}
+#ftoolbar.on{display:flex;}
+.tb{padding:7px 13px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--t2);font-size:12px;cursor:pointer;font-family:var(--mono);flex-shrink:0;transition:all .1s;white-space:nowrap;}
+.tb:active,.tb:hover{background:var(--s3);color:var(--text);}
+.tb.hi{background:#0d1a3a;color:var(--acc2);border-color:#2a3a7e;}
+.tb.danger{color:var(--red);border-color:#3a1a1a;}
+.rv-wrap{padding:14px 12px;display:flex;flex-direction:column;gap:12px;}
+.rv-card{background:var(--s1);border:1px solid var(--border);border-radius:16px;padding:26px 20px;text-align:center;}
+.rv-chip{display:inline-flex;align-items:center;gap:5px;background:var(--s3);border:1px solid var(--border);border-radius:20px;padding:3px 12px;font-size:10px;font-family:var(--mono);color:var(--acc2);margin-bottom:16px;letter-spacing:.08em;text-transform:uppercase;}
+.rv-q{font-size:19px;font-weight:600;color:var(--text);line-height:1.55;}
+.rv-sep{height:1px;background:var(--border);margin:20px 0;}
+.rv-a-lbl{font-size:9px;font-family:var(--mono);color:var(--green);text-transform:uppercase;letter-spacing:.15em;margin-bottom:10px;}
+.rv-a{font-size:15px;color:#b0d4c0;line-height:1.7;text-align:left;}
+.reveal-btn{width:100%;padding:14px;background:var(--s2);border:1px solid var(--border2);border-radius:12px;color:var(--text);font-size:14px;font-weight:600;cursor:pointer;font-family:var(--sans);transition:all .12s;}
+.reveal-btn:hover,.reveal-btn:active{background:var(--s3);}
+.rate-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;}
+.rate-btn{padding:10px 2px;border-radius:9px;border:1px solid;cursor:pointer;font-family:var(--mono);font-size:11px;font-weight:600;line-height:1.3;transition:transform .1s;}
+.rate-btn:active{transform:scale(.93);}
+.pbar{height:2px;background:var(--s3);flex-shrink:0;}
+.pfill{height:100%;background:var(--acc);transition:width .35s ease;}
+.sync-section{margin:10px 12px 0;background:var(--s1);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;}
+.sync-hdr{padding:10px 14px;font-family:var(--mono);font-size:10px;font-weight:600;color:var(--t2);text-transform:uppercase;letter-spacing:.1em;border-bottom:1px solid var(--border);background:var(--s2);}
+.sync-body{padding:8px 14px;}
+.sync-row{display:flex;align-items:center;gap:10px;padding:9px 0;}
+.sync-row+.sync-row{border-top:1px solid var(--border);}
+.sync-ico{width:34px;height:34px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0;}
+.sync-info{flex:1;min-width:0;}
+.sync-info strong{display:block;font-size:13px;font-weight:600;color:var(--text);margin-bottom:2px;}
+.sync-info span{font-size:11px;color:var(--t3);font-family:var(--mono);}
+.sync-btn{padding:7px 14px;border-radius:9px;border:1px solid;font-size:12px;font-weight:600;font-family:var(--mono);cursor:pointer;white-space:nowrap;flex-shrink:0;transition:filter .12s;}
+.sync-btn:active,.sync-btn:hover{filter:brightness(1.15);}
+.btn-export{background:#0d1a3a;color:var(--acc2);border-color:#2a3a7e;}
+.btn-import{background:#0d1a1a;color:var(--green);border-color:#1a3a2a;}
+.btn-danger{background:#1a0d0d;color:var(--red);border-color:#3a1a1a;}
+.stat-bar{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--border);border:1px solid var(--border);border-radius:var(--r);margin:10px 12px 0;overflow:hidden;}
+.stat-cell{background:var(--s1);padding:10px 8px;text-align:center;}
+.stat-n{font-family:var(--mono);font-size:18px;font-weight:600;color:var(--text);}
+.stat-l{font-size:9px;font-family:var(--mono);color:var(--t3);text-transform:uppercase;letter-spacing:.08em;margin-top:2px;}
+.overlay{position:fixed;inset:0;background:#000a;z-index:150;display:none;align-items:flex-end;}
+.overlay.open{display:flex;}
+.sheet{background:var(--s1);border-radius:20px 20px 0 0;padding:20px 16px calc(24px + var(--safe-b));width:100%;border-top:1px solid var(--border);animation:slideUp .22s ease;}
+.sheet-h{font-family:var(--mono);font-size:14px;font-weight:600;color:var(--text);margin-bottom:16px;text-align:center;}
+.sheet-inp{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:13px 14px;color:var(--text);font-size:15px;outline:none;font-family:var(--sans);}
+.sheet-inp:focus{border-color:var(--acc);}
+.sbtn{width:100%;padding:13px;border:none;border-radius:11px;color:#fff;font-size:14px;font-weight:600;cursor:pointer;font-family:var(--mono);margin-top:9px;}
+.sbtn.primary{background:var(--acc);}
+.sbtn.ghost{background:transparent;border:1px solid var(--border);color:var(--t2);}
+.sbtn.danger{background:#1a0d0d;border:1px solid #3a1a1a;color:var(--red);}
+.merge-card{padding:12px 14px;border-radius:10px;border:2px solid var(--border);cursor:pointer;margin-bottom:8px;}
+.merge-card.sel{border-color:var(--acc);}
+.merge-card strong{font-size:13px;color:var(--text);display:block;margin-bottom:3px;}
+.merge-card span{font-size:11px;color:var(--t3);line-height:1.5;display:block;}
+.wf-guide{margin:10px 12px 0;border:1px solid var(--border);border-radius:var(--r);overflow:hidden;}
+.wf-hdr{padding:10px 14px;background:var(--s2);font-family:var(--mono);font-size:10px;font-weight:600;color:var(--t2);text-transform:uppercase;letter-spacing:.1em;border-bottom:1px solid var(--border);}
+.wf-body{padding:8px 14px;}
+.wf-step{display:flex;gap:10px;padding:8px 0;font-size:12px;color:var(--t2);line-height:1.5;}
+.wf-step+.wf-step{border-top:1px solid var(--border);}
+.wf-n{width:20px;height:20px;border-radius:50%;background:var(--s3);border:1px solid var(--border);font-family:var(--mono);font-size:10px;color:var(--acc2);display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;}
+code{background:var(--s3);padding:1px 5px;border-radius:4px;font-family:var(--mono);font-size:11px;color:var(--acc2);}
+.s-bar{margin:10px 12px;background:var(--s1);border:1px solid var(--border);border-radius:11px;display:flex;align-items:center;padding:0 12px;}
+.s-bar input{flex:1;background:transparent;border:none;outline:none;color:var(--text);font-size:14px;padding:11px 8px;font-family:var(--sans);}
+.s-ico{color:var(--t3);font-size:16px;}
+.s-hit{padding:12px 14px;margin:0 12px 8px;background:var(--s1);border:1px solid var(--border);border-radius:11px;cursor:pointer;}
+.s-hit:active{border-color:var(--border2);}
+.s-doc{font-size:9px;font-family:var(--mono);color:var(--acc);text-transform:uppercase;letter-spacing:.1em;margin-bottom:5px;}
+.hint{margin:12px 12px 0;padding:12px 14px;background:var(--s1);border:1px solid var(--border);border-radius:var(--r);font-size:11px;color:var(--t3);font-family:var(--mono);line-height:1.9;}
+.rv-done{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:48px 24px;text-align:center;gap:14px;}
+#toast{position:fixed;bottom:calc(66px + var(--safe-b));left:50%;transform:translateX(-50%) translateY(6px);background:var(--s2);border:1px solid var(--border2);color:var(--text);padding:9px 18px;border-radius:20px;font-size:12px;font-family:var(--mono);z-index:200;opacity:0;transition:opacity .2s,transform .2s;pointer-events:none;white-space:nowrap;max-width:92vw;text-align:center;}
+#toast.on{opacity:1;transform:translateX(-50%) translateY(0);}
+@keyframes slideUp{from{transform:translateY(40px);opacity:0}to{transform:translateY(0);opacity:1}}
+@keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+@keyframes pulse{0%,100%{opacity:1;box-shadow:0 0 8px var(--acc)}50%{opacity:.5;box-shadow:0 0 3px var(--acc)}}
+.fade-in{animation:fadeIn .18s ease;}
+@media(min-width:640px){
+  #app{max-width:500px;margin:0 auto;box-shadow:0 0 80px #000;}
+  .fab{right:calc(50% - 250px + 16px);}
+}
+</style>
+</head>
+<body>
+<div id="app">
+
+<!-- HOME -->
+<div id="s-home" class="screen">
+  <div class="hdr">
+    <div class="hdr-logo"><div class="logo-dot"></div>NoteVault</div>
+    <div style="flex:1"></div>
+    <button class="icon-btn" onclick="switchTab('sync')" title="File Sync">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="20" height="20"><polyline points="1 4 1 10 7 10"/><polyline points="23 20 23 14 17 14"/><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"/></svg>
+    </button>
+  </div>
+  <div class="stat-bar" id="stat-bar"></div>
+  <div id="review-cta" style="display:none;padding:10px 12px 0">
+    <button onclick="reviewTab()" style="width:100%;background:linear-gradient(135deg,#0d1a3a,#131828);border:1px solid #2a3a7e;border-radius:12px;padding:13px 16px;color:var(--acc2);font-size:14px;font-weight:700;cursor:pointer;font-family:var(--mono);display:flex;align-items:center;justify-content:center;gap:9px;">
+      <span>▶</span><span id="cta-txt">Review due cards</span>
+    </button>
+  </div>
+  <div class="scroll" id="doc-list" style="padding-bottom:80px"></div>
+  <button class="fab" onclick="showNewDocSheet()">+</button>
+</div>
+
+<!-- EDITOR -->
+<div id="s-editor" class="screen">
+  <div class="hdr">
+    <button class="icon-btn" onclick="goHome()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+    </button>
+    <input id="ed-title" class="hdr-title" placeholder="Untitled" />
+    <button class="icon-btn" onclick="showEdMenu()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><circle cx="12" cy="5" r="1.2" fill="currentColor"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/><circle cx="12" cy="19" r="1.2" fill="currentColor"/></svg>
+    </button>
+  </div>
+  <div class="scroll" id="ed-content" style="padding-bottom:130px"></div>
+  <div id="ftoolbar">
+    <button class="tb" onclick="tbNew()">＋ Item</button>
+    <button class="tb" onclick="tbIndent()">⇥ Indent</button>
+    <button class="tb" onclick="tbOutdent()">⇤ Outdent</button>
+    <button class="tb hi" onclick="tbCard()">⚡ + Card</button>
+    <button class="tb danger" onclick="tbDel()">✕ Del</button>
+  </div>
+</div>
+
+<!-- REVIEW -->
+<div id="s-review" class="screen">
+  <div class="hdr">
+    <button class="icon-btn" onclick="exitReview()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+    </button>
+    <div class="hdr-title">Recall Session</div>
+    <div id="rv-ctr" style="font-size:11px;color:var(--t2);font-family:var(--mono);flex-shrink:0;"></div>
+  </div>
+  <div class="pbar"><div class="pfill" id="rv-prog" style="width:0%"></div></div>
+  <div class="scroll" id="rv-content"></div>
+</div>
+
+<!-- SEARCH -->
+<div id="s-search" class="screen">
+  <div class="hdr"><div class="hdr-title">Search</div></div>
+  <div class="s-bar"><span class="s-ico">⌕</span><input id="srch-inp" placeholder="Search all notes and flashcards…" oninput="doSearch(this.value)"/></div>
+  <div class="scroll" id="srch-res" style="padding:8px 0 80px">
+    <div style="padding:20px 14px;font-size:12px;color:var(--t3);font-family:var(--mono)">type to search across all documents…</div>
+  </div>
+</div>
+
+<!-- SYNC -->
+<div id="s-sync" class="screen">
+  <div class="hdr">
+    <div class="hdr-logo" style="font-size:14px;gap:8px;">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--acc)" stroke-width="2"><polyline points="1 4 1 10 7 10"/><polyline points="23 20 23 14 17 14"/><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"/></svg>
+      File Sync
+    </div>
+  </div>
+  <div class="scroll" style="padding-bottom:80px">
+
+    <div class="sync-section">
+      <div class="sync-hdr">Export — save to file</div>
+      <div class="sync-body">
+        <div class="sync-row">
+          <div class="sync-ico" style="background:#0d1a3a">💾</div>
+          <div class="sync-info"><strong>Export All Data</strong><span>Docs + notes + all SRS progress</span></div>
+          <button class="sync-btn btn-export" onclick="exportFile()">Export</button>
+        </div>
+        <div class="sync-row">
+          <div class="sync-ico" style="background:#0d1a0d">🃏</div>
+          <div class="sync-info"><strong>Export Cards Only</strong><span>Flashcards + SRS data only</span></div>
+          <button class="sync-btn btn-export" onclick="exportCards()">Export</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="sync-section">
+      <div class="sync-hdr">Import — load from file</div>
+      <div class="sync-body">
+        <div class="sync-row">
+          <div class="sync-ico" style="background:#0d1a1a">📂</div>
+          <div class="sync-info"><strong>Import .nvault File</strong><span>Merge or replace with a saved file</span></div>
+          <button class="sync-btn btn-import" onclick="triggerImport()">Import</button>
+        </div>
+      </div>
+      <input type="file" id="file-input" accept=".nvault,.json" style="display:none" onchange="handleImport(this)">
+    </div>
+
+    <div class="wf-guide">
+      <div class="wf-hdr">Cross-Device Workflow</div>
+      <div class="wf-body">
+        <div class="wf-step"><div class="wf-n">1</div><div><strong style="color:var(--text)">Laptop:</strong> Open NoteVault.html in Chrome. Write flashcards using <code>Question &gt;&gt; Answer</code></div></div>
+        <div class="wf-step"><div class="wf-n">2</div><div><strong style="color:var(--text)">Laptop:</strong> Go to <em>Sync → Export All</em>. Save the <code>.nvault</code> file to Google Drive / send via WhatsApp / email.</div></div>
+        <div class="wf-step"><div class="wf-n">3</div><div><strong style="color:var(--text)">Phone:</strong> Download the file. Open NoteVault, go to <em>Sync → Import</em>. Choose <strong>Merge</strong> to keep review progress.</div></div>
+        <div class="wf-step"><div class="wf-n">4</div><div><strong style="color:var(--text)">Phone:</strong> Tap <strong>▶ Review</strong> on home screen for your daily recall session.</div></div>
+        <div class="wf-step"><div class="wf-n">5</div><div><strong style="color:var(--text)">Phone:</strong> After reviewing, Export again. The <code>.nvault</code> file now has your updated schedule. Import back on laptop to keep in sync.</div></div>
+      </div>
+    </div>
+
+    <div class="sync-section" style="margin-bottom:16px">
+      <div class="sync-hdr" style="color:var(--red)">Danger Zone</div>
+      <div class="sync-body">
+        <div class="sync-row">
+          <div class="sync-ico" style="background:#1a0d0d">🗑</div>
+          <div class="sync-info"><strong>Clear All Data</strong><span>Wipes everything — export first!</span></div>
+          <button class="sync-btn btn-danger" onclick="confirmClear()">Clear</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Bottom nav -->
+<nav id="bnav">
+  <button class="bnav-item active" id="bn-home" onclick="switchTab('home')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9,22 9,12 15,12 15,22"/></svg>Notes
+  </button>
+  <button class="bnav-item" id="bn-search" onclick="switchTab('search')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>Search
+  </button>
+  <button class="bnav-item" id="bn-review" onclick="reviewTab()">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+    <span class="nb-badge" id="rv-badge" style="display:none">0</span>Review
+  </button>
+  <button class="bnav-item" id="bn-sync" onclick="switchTab('sync')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="1 4 1 10 7 10"/><polyline points="23 20 23 14 17 14"/><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"/></svg>Sync
+  </button>
+</nav>
+</div>
+
+<!-- New doc sheet -->
+<div class="overlay" id="new-doc-ov" onclick="if(event.target===this)closeNewDoc()">
+  <div class="sheet">
+    <div class="sheet-h">New Document</div>
+    <input class="sheet-inp" id="new-doc-inp" placeholder="Document title…" maxlength="80" onkeydown="if(event.key==='Enter')confirmNewDoc()"/>
+    <button class="sbtn primary" onclick="confirmNewDoc()">Create</button>
+    <button class="sbtn ghost" onclick="closeNewDoc()">Cancel</button>
+  </div>
+</div>
+
+<!-- Editor menu -->
+<div class="overlay" id="ed-menu-ov" onclick="if(event.target===this)closeEdMenu()">
+  <div class="sheet">
+    <div class="sheet-h" id="ed-menu-h">Actions</div>
+    <button onclick="reviewThisDoc()" style="display:flex;align-items:center;gap:10px;width:100%;background:var(--s2);border:1px solid var(--border);border-radius:11px;padding:13px 14px;color:var(--text);font-size:13px;cursor:pointer;font-family:var(--sans);text-align:left;margin-bottom:8px;">▶ Review this doc's flashcards</button>
+    <button onclick="renameDoc()" style="display:flex;align-items:center;gap:10px;width:100%;background:var(--s2);border:1px solid var(--border);border-radius:11px;padding:13px 14px;color:var(--text);font-size:13px;cursor:pointer;font-family:var(--sans);text-align:left;margin-bottom:8px;">✎ Rename document</button>
+    <button onclick="deleteDoc()" style="display:flex;align-items:center;gap:10px;width:100%;background:#1a0d0d;border:1px solid #3a1a1a;border-radius:11px;padding:13px 14px;color:var(--red);font-size:13px;cursor:pointer;font-family:var(--sans);text-align:left;">🗑 Delete document</button>
+    <button class="sbtn ghost" onclick="closeEdMenu()">Cancel</button>
+  </div>
+</div>
+
+<!-- Import mode sheet -->
+<div class="overlay" id="import-ov" onclick="if(event.target===this)closeImport()">
+  <div class="sheet">
+    <div class="sheet-h">Import File</div>
+    <div style="font-size:12px;color:var(--t2);font-family:var(--mono);margin-bottom:12px;text-align:center;line-height:1.6" id="import-info">Choose how to handle existing data:</div>
+    <div class="merge-card sel" id="mo-merge" onclick="selMerge('merge')">
+      <strong>Merge (recommended)</strong>
+      <span>Add new docs/items; update SRS where the file has newer review data. Best for phone ↔ laptop sync.</span>
+    </div>
+    <div class="merge-card" id="mo-replace" onclick="selMerge('replace')">
+      <strong>Replace Everything</strong>
+      <span>Wipe all current data and load the file fresh. Use if you want a clean start from the file.</span>
+    </div>
+    <button class="sbtn primary" onclick="confirmImport()">Import</button>
+    <button class="sbtn ghost" onclick="closeImport()">Cancel</button>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+const LS='nv_v3';
+const gid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+const today=()=>new Date().toISOString().split('T')[0];
+const esc=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+function sm2(q,{repetitions:r=0,easeFactor:ef=2.5,interval:iv=0}={}){
+  let nr=r,nef=ef,ni=iv;
+  if(q>=3){nr=r+1;ni=r===0?1:r===1?6:Math.round(iv*ef);}else{nr=0;ni=1;}
+  nef=Math.max(1.3,ef+0.1-(5-q)*(0.08+(5-q)*0.02));
+  const d=new Date();d.setDate(d.getDate()+ni);
+  return{repetitions:nr,easeFactor:nef,interval:ni,dueDate:d.toISOString().split('T')[0]};
+}
+const isFC=it=>it.content.includes('>>');
+const isDue=it=>it.srs&&it.srs.dueDate<=today();
+const parseFC=c=>{const i=c.indexOf('>>');return i<0?{q:c.trim(),a:''}:{q:c.slice(0,i).trim(),a:c.slice(i+2).trim()};};
+
+let D,curDoc,focIdx=-1,rvCards=[],rvIdx=0,rvShowAns=false,importPending=null,mergeMode='merge';
+
+const loadLS=()=>{try{const r=localStorage.getItem(LS);return r?JSON.parse(r):null;}catch{return null;}};
+const saveLS=()=>{try{localStorage.setItem(LS,JSON.stringify(D));}catch{}};
+
+function defaultData(){
+  const t=today();
+  return{version:3,documents:[{
+    id:'doc_welcome',title:'My Flashcards',createdAt:new Date().toISOString(),
+    items:[
+      {id:gid(),content:'Write flashcards using the format below',level:0,srs:null},
+      {id:gid(),content:'What is spaced repetition? >> A technique that schedules reviews at increasing intervals to move info into long-term memory',level:1,srs:{repetitions:0,easeFactor:2.5,interval:0,dueDate:t}},
+      {id:gid(),content:'Capital of Japan >> Tokyo — largest metropolitan area on Earth (~37 million people)',level:0,srs:{repetitions:0,easeFactor:2.5,interval:0,dueDate:t}},
+      {id:gid(),content:"Newton's First Law >> An object stays at rest or in uniform motion unless acted on by an external force",level:0,srs:{repetitions:0,easeFactor:2.5,interval:0,dueDate:t}},
+      {id:gid(),content:'Mitochondria >> Produces ATP via cellular respiration — the powerhouse of the cell',level:0,srs:{repetitions:0,easeFactor:2.5,interval:0,dueDate:t}},
+      {id:gid(),content:'Speed of light >> 299,792,458 m/s (≈ 3×10⁸ m/s) in a vacuum',level:0,srs:{repetitions:0,easeFactor:2.5,interval:0,dueDate:t}},
+    ]
+  }]};
+}
+
+window.addEventListener('load',()=>{D=loadLS()||defaultData();renderHome();showTab('home');});
+
+// ── NAV ──────────────────────────────────────────────────────────
+function showTab(tab){
+  ['home','editor','review','search','sync'].forEach(s=>document.getElementById('s-'+s).classList.remove('active'));
+  ['home','search','review','sync'].forEach(s=>{const b=document.getElementById('bn-'+s);if(b)b.classList.remove('active');});
+  document.getElementById('s-'+tab).classList.add('active');
+  const b=document.getElementById('bn-'+tab);if(b)b.classList.add('active');
+}
+function switchTab(tab){hideFT();if(tab==='home')renderHome();if(tab==='search')setTimeout(()=>document.getElementById('srch-inp').focus(),150);showTab(tab);}
+function openEditor(id){curDoc=id;focIdx=-1;renderEditor();showTab('editor');}
+function goHome(){hideFT();renderHome();showTab('home');}
+function exitReview(){renderHome();showTab('home');}
+function reviewTab(){
+  const cards=D.documents.flatMap(d=>d.items.filter(i=>isDue(i)&&isFC(i)).map(i=>({...i,_d:d.id})));
+  if(!cards.length){toast('🎉 No cards due right now!');return;}
+  rvCards=cards;rvIdx=0;rvShowAns=false;hideFT();renderRv();showTab('review');
+}
+
+// ── HOME ─────────────────────────────────────────────────────────
+function renderHome(){
+  const totalDue=D.documents.reduce((n,d)=>n+d.items.filter(i=>isDue(i)&&isFC(i)).length,0);
+  const totalCards=D.documents.reduce((n,d)=>n+d.items.filter(i=>i.srs).length,0);
+  const totalItems=D.documents.reduce((n,d)=>n+d.items.length,0);
+  document.getElementById('stat-bar').innerHTML=[
+    [D.documents.length,'Docs'],[totalItems,'Notes'],[totalCards,'Cards'],[totalDue,'Due']
+  ].map(([n,l])=>`<div class="stat-cell"><div class="stat-n" style="${l==='Due'&&n>0?'color:var(--acc2)':''}">${n}</div><div class="stat-l">${l}</div></div>`).join('');
+  const cta=document.getElementById('review-cta'),badge=document.getElementById('rv-badge');
+  if(totalDue>0){cta.style.display='block';document.getElementById('cta-txt').textContent=`Review — ${totalDue} card${totalDue>1?'s':''} due today`;badge.style.display='flex';badge.textContent=totalDue;}
+  else{cta.style.display='none';badge.style.display='none';}
+  const el=document.getElementById('doc-list');
+  el.innerHTML=D.documents.map(doc=>{
+    const due=doc.items.filter(i=>isDue(i)&&isFC(i)).length;
+    const cards=doc.items.filter(i=>i.srs).length;
+    const newC=doc.items.filter(i=>i.srs&&i.srs.repetitions===0).length;
+    const sched=doc.items.filter(i=>i.srs&&!isDue(i)&&i.srs.repetitions>0).length;
+    return`<div class="doc-card" onclick="openEditor('${doc.id}')">
+      <div class="dc-title">${esc(doc.title)}</div>
+      <div class="dc-meta">
+        <span>${doc.items.length} items</span>
+        ${cards?`<span>${cards} cards</span>`:''}
+        ${due?`<span class="dc-due">⚡ ${due} due</span>`:''}
+        ${newC?`<span style="color:var(--yellow)">✦ ${newC} new</span>`:''}
+        ${sched?`<span style="color:var(--green)">✓ ${sched} sched</span>`:''}
+      </div>
+    </div>`;
+  }).join('')+'<div style="height:16px"></div>';
+}
+
+// ── EDITOR ───────────────────────────────────────────────────────
+function getDoc(){return D.documents.find(d=>d.id===curDoc);}
+function renderEditor(){
+  const doc=getDoc();if(!doc)return;
+  const ti=document.getElementById('ed-title');
+  ti.value=doc.title;
+  ti.oninput=e=>{D.documents=D.documents.map(d=>d.id===curDoc?{...d,title:e.target.value}:d);saveLS();};
+  const el=document.getElementById('ed-content');
+  if(!doc.items.length){el.innerHTML='<div style="padding:32px 16px;font-size:13px;color:var(--t3);font-family:var(--mono)">empty — use toolbar below</div>';return;}
+  el.innerHTML=doc.items.map((it,i)=>{
+    const fc=isFC(it),due=isDue(it);
+    const indent=it.level*22;
+    let badge='';
+    if(fc){if(due)badge=`<span class="fc-badge fc-due">⚡ due</span>`;else if(it.srs?.repetitions>0)badge=`<span class="fc-badge fc-sched">+${it.srs.interval}d</span>`;else badge=`<span class="fc-badge fc-new">new</span>`;}
+    return`<div class="item-row" style="padding-left:${12+indent}px" data-i="${i}">
+      <div class="item-bullet"><div class="bdot${it.level>0?' child':''}"></div></div>
+      <textarea class="item-ta${fc?' fc':''}" data-i="${i}" rows="1"
+        oninput="onInput(this,${i})" onfocus="onFocus(${i})" onkeydown="onKey(event,${i})"
+        placeholder="${i===0&&doc.items.length<=1?'type a note… Q >> A for flashcard':''}"
+      >${esc(it.content)}</textarea>
+      <div class="fc-bd" data-i="${i}">${badge}</div>
+    </div>`;
+  }).join('')+'<div class="hint"><code>Q &gt;&gt; A</code> creates flashcard · toolbar: indent / outdent / +card / delete</div>';
+  setTimeout(resizeAll,30);
+}
+function resizeAll(){document.querySelectorAll('.item-ta').forEach(resize);}
+function resize(el){el.style.height='auto';el.style.height=el.scrollHeight+'px';}
+
+function onInput(el,i){
+  resize(el);
+  const doc=getDoc();if(!doc)return;
+  const items=[...doc.items];
+  const it={...items[i],content:el.value};
+  if(el.value.includes('>>') && !it.srs){it.srs={repetitions:0,easeFactor:2.5,interval:0,dueDate:today()};toast('⚡ Flashcard created!');}
+  items[i]=it;
+  D.documents=D.documents.map(d=>d.id===curDoc?{...d,items}:d);saveLS();
+  const bd=document.querySelector(`.fc-bd[data-i="${i}"]`);
+  if(bd){
+    const fc=isFC(it),due=isDue(it);
+    bd.innerHTML=fc?(due?`<span class="fc-badge fc-due">⚡ due</span>`:(it.srs?.repetitions>0?`<span class="fc-badge fc-sched">+${it.srs.interval}d</span>`:`<span class="fc-badge fc-new">new</span>`)):'';
+  }
+  el.classList.toggle('fc',isFC(it));
+}
+function onFocus(i){focIdx=i;showFT();}
+function onKey(e,i){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();tbNewAt(i);}}
+
+function showFT(){document.getElementById('ftoolbar').classList.add('on');}
+function hideFT(){document.getElementById('ftoolbar').classList.remove('on');focIdx=-1;}
+
+if(window.visualViewport){
+  window.visualViewport.addEventListener('resize',()=>{
+    const ft=document.getElementById('ftoolbar');if(!ft.classList.contains('on'))return;
+    const kbH=window.innerHeight-window.visualViewport.height-window.visualViewport.offsetTop;
+    ft.style.bottom=Math.max(0,kbH)+'px';
+  });
+}
+
+function tbNew(){tbNewAt(focIdx>=0?focIdx:(getDoc()?.items.length||1)-1);}
+function tbNewAt(i){
+  const doc=getDoc();if(!doc)return;
+  const lv=i>=0&&i<doc.items.length?doc.items[i].level:0;
+  const ni={id:gid(),content:'',level:lv,srs:null};
+  updItems([...doc.items.slice(0,i+1),ni,...doc.items.slice(i+1)],true,i+1);
+}
+function tbIndent(){
+  if(focIdx<0)return;const items=getDoc().items;
+  const max=focIdx>0?items[focIdx-1].level+1:0;
+  if(items[focIdx].level<max)updItems(items.map((it,i)=>i===focIdx?{...it,level:it.level+1}:it),true,focIdx);
+}
+function tbOutdent(){
+  if(focIdx<0)return;const items=getDoc().items;
+  if(items[focIdx].level>0)updItems(items.map((it,i)=>i===focIdx?{...it,level:it.level-1}:it),true,focIdx);
+}
+function tbCard(){
+  if(focIdx<0)return;
+  updItems(getDoc().items.map((it,i)=>{
+    if(i!==focIdx)return it;
+    const content=it.content.includes('>>')?it.content:it.content+(it.content.trim()?'  >>  ':' >>  ');
+    return{...it,content,srs:it.srs||{repetitions:0,easeFactor:2.5,interval:0,dueDate:today()}};
+  }),true,focIdx);
+  toast('⚡ Flashcard created!');
+}
+function tbDel(){
+  if(focIdx<0)return;
+  const items=getDoc().items;if(items.length<=1){toast("Can't delete last item");return;}
+  const idx=focIdx,nf=Math.max(0,idx-1);focIdx=-1;
+  updItems(items.filter((_,i)=>i!==idx),true,nf);
+}
+function updItems(items,rerender=true,refocus=-1){
+  D.documents=D.documents.map(d=>d.id===curDoc?{...d,items}:d);saveLS();
+  if(rerender){
+    renderEditor();
+    if(refocus>=0){
+      setTimeout(()=>{const tas=document.querySelectorAll('.item-ta');if(tas[refocus]){tas[refocus].focus();const v=tas[refocus].value;tas[refocus].setSelectionRange(v.length,v.length);}resizeAll();},40);
+    }else setTimeout(resizeAll,40);
+  }
+}
+
+// ── REVIEW ───────────────────────────────────────────────────────
+function reviewThisDoc(){
+  closeEdMenu();
+  const cards=getDoc().items.filter(i=>isDue(i)&&isFC(i)).map(i=>({...i,_d:curDoc}));
+  if(!cards.length){toast('No due cards in this doc');return;}
+  rvCards=cards;rvIdx=0;rvShowAns=false;hideFT();renderRv();showTab('review');
+}
+function renderRv(){
+  document.getElementById('rv-ctr').textContent=`${rvIdx+1} / ${rvCards.length}`;
+  document.getElementById('rv-prog').style.width=`${(rvIdx/rvCards.length)*100}%`;
+  const card=rvCards[rvIdx];
+  const {q,a}=parseFC(card.content);
+  const docName=D.documents.find(d=>d.id===card._d)?.title||'';
+  document.getElementById('rv-content').innerHTML=`
+  <div class="rv-wrap fade-in">
+    <div class="rv-card">
+      <div class="rv-chip">▶ ${esc(docName)}</div>
+      <div class="rv-q">${esc(q)}</div>
+      ${!rvShowAns
+        ?`<div class="rv-sep"></div><button class="reveal-btn" onclick="revealAns()">Show Answer ↓</button>`
+        :`<div class="rv-sep"></div><div class="rv-a-lbl">Answer</div><div class="rv-a">${esc(a||'(no answer defined)')}</div>`}
+    </div>
+    ${rvShowAns?`
+    <div style="text-align:center;font-size:11px;color:var(--t3);font-family:var(--mono);margin:-4px 0 2px">Rate your recall to schedule next review</div>
+    <div class="rate-grid">
+      <button class="rate-btn" onclick="rate(1)" style="background:#1a0d0d;color:var(--red);border-color:#3a1a1a">Again<br><small style="opacity:.7">forgot</small></button>
+      <button class="rate-btn" onclick="rate(2)" style="background:#1a140d;color:var(--orange);border-color:#3a2a1a">Hard<br><small style="opacity:.7">tough</small></button>
+      <button class="rate-btn" onclick="rate(3)" style="background:#0d1a0d;color:var(--green);border-color:#1a3a1a">Good<br><small style="opacity:.7">ok</small></button>
+      <button class="rate-btn" onclick="rate(4)" style="background:#0d141a;color:#60a5fa;border-color:#1a2a3a">Easy<br><small style="opacity:.7">quick</small></button>
+      <button class="rate-btn" onclick="rate(5)" style="background:#0d1a3a;color:var(--acc2);border-color:#1a2a6e">★<br><small style="opacity:.7">perfect</small></button>
+    </div>`:''}
+    <button onclick="exitReview()" style="background:transparent;border:none;color:var(--t3);cursor:pointer;font-family:var(--mono);font-size:11px;padding:6px 8px;align-self:center;">← exit session</button>
+  </div>`;
+}
+function revealAns(){rvShowAns=true;renderRv();}
+function rate(q){
+  const card=rvCards[rvIdx];
+  const ns=sm2(q,card.srs);
+  D.documents=D.documents.map(d=>{
+    if(d.id!==card._d)return d;
+    return{...d,items:d.items.map(it=>it.id===card.id?{...it,srs:{...ns,lastReviewed:today()}}:it)};
+  });
+  saveLS();
+  if(rvIdx<rvCards.length-1){rvIdx++;rvShowAns=false;renderRv();}
+  else{
+    document.getElementById('rv-prog').style.width='100%';
+    document.getElementById('rv-ctr').textContent='✓ done';
+    document.getElementById('rv-content').innerHTML=`<div class="rv-done">
+      <div style="font-size:56px">🎉</div>
+      <div style="font-family:var(--mono);font-size:20px;font-weight:700;color:var(--acc2)">Session complete!</div>
+      <div style="font-size:13px;color:var(--t2);line-height:1.6">Reviewed ${rvCards.length} card${rvCards.length>1?'s':''}.<br>Export your file to save the updated schedule.</div>
+      <button onclick="switchTab('sync')" style="background:var(--acc);border:none;border-radius:11px;color:#fff;padding:12px 28px;font-size:13px;font-weight:700;cursor:pointer;font-family:var(--mono);">💾 Export Now</button>
+      <button onclick="exitReview()" style="background:transparent;border:1px solid var(--border);border-radius:11px;color:var(--t2);padding:10px 24px;font-size:13px;cursor:pointer;font-family:var(--mono);">Back to Notes</button>
+    </div>`;
+  }
+}
+
+// ── SEARCH ───────────────────────────────────────────────────────
+function doSearch(q){
+  const el=document.getElementById('srch-res');
+  if(q.trim().length<2){el.innerHTML='<div style="padding:20px 14px;font-size:12px;color:var(--t3);font-family:var(--mono)">type to search…</div>';return;}
+  const lo=q.toLowerCase();
+  const hits=D.documents.flatMap(d=>d.items.filter(i=>i.content.toLowerCase().includes(lo)).map(i=>({...i,_dt:d.title,_d:d.id}))).slice(0,30);
+  if(!hits.length){el.innerHTML=`<div style="padding:20px 14px;font-size:12px;color:var(--t3);font-family:var(--mono)">no results for "${esc(q)}"</div>`;return;}
+  const rx=new RegExp(`(${q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')})`, 'gi');
+  el.innerHTML='<div style="height:8px"></div>'+hits.map(it=>{
+    const hi=esc(it.content).replace(rx,'<mark style="background:#1a2a5e;color:var(--acc2);border-radius:2px;padding:0 2px">$1</mark>');
+    return`<div class="s-hit" onclick="openEditor('${it._d}')">
+      <div class="s-doc">${esc(it._dt)}</div>
+      <div style="font-size:13px;line-height:1.5">${hi}</div>
+      ${isFC(it)?'<div style="font-size:10px;color:var(--t3);margin-top:4px;font-family:var(--mono)">🃏 flashcard</div>':''}
+    </div>`;
+  }).join('');
+}
+
+// ── FILE EXPORT ──────────────────────────────────────────────────
+function buildExport(cardsOnly){
+  return JSON.stringify({
+    version:3,
+    exportedAt:new Date().toISOString(),
+    exportedFrom:navigator.userAgent.includes('Mobile')?'mobile':'desktop',
+    documents:cardsOnly
+      ?D.documents.map(d=>({...d,items:d.items.filter(i=>i.srs)}))
+      :D.documents
+  },null,2);
+}
+function dlFile(content,name){
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([content],{type:'application/json'}));
+  a.download=name;document.body.appendChild(a);a.click();document.body.removeChild(a);
+}
+function exportFile(){dlFile(buildExport(false),`notevault-${today()}.nvault`);toast('💾 Exported!');}
+function exportCards(){dlFile(buildExport(true),`notevault-cards-${today()}.nvault`);toast('💾 Cards exported!');}
+function triggerImport(){document.getElementById('file-input').click();}
+function handleImport(input){
+  const file=input.files[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    try{
+      const parsed=JSON.parse(e.target.result);
+      if(!parsed.documents||!Array.isArray(parsed.documents))throw 0;
+      importPending=parsed;
+      const ts=parsed.exportedAt?new Date(parsed.exportedAt).toLocaleString():'unknown date';
+      const cards=parsed.documents.reduce((n,d)=>n+d.items.filter(i=>i.srs).length,0);
+      document.getElementById('import-info').innerHTML=
+        `File from <strong>${ts}</strong><br>${parsed.documents.length} doc(s) · ${parsed.documents.reduce((n,d)=>n+d.items.length,0)} notes · ${cards} flashcards`;
+      document.getElementById('import-ov').classList.add('open');
+    }catch{toast('❌ Invalid file format');}
+  };
+  reader.readAsText(file);
+  input.value='';
+}
+function selMerge(mode){
+  mergeMode=mode;
+  document.getElementById('mo-merge').classList.toggle('sel',mode==='merge');
+  document.getElementById('mo-replace').classList.toggle('sel',mode==='replace');
+}
+function confirmImport(){
+  if(!importPending)return;
+  if(mergeMode==='replace'){
+    D={...importPending};saveLS();toast(`✅ Replaced — ${D.documents.length} docs loaded`);
+  }else{
+    // Smart merge: preserve whichever SRS data is more recent
+    const map=new Map(D.documents.map(d=>[d.id,d]));
+    for(const fd of importPending.documents){
+      if(map.has(fd.id)){
+        const ld=map.get(fd.id);
+        const lm=new Map(ld.items.map(i=>[i.id,i]));
+        for(const fi of fd.items){
+          if(lm.has(fi.id)){
+            const li=lm.get(fi.id);
+            let merged={...li,content:fi.content}; // always take latest content
+            if(fi.srs&&li.srs){
+              const fd2=(fi.srs.lastReviewed||fi.srs.dueDate||'0');
+              const ld2=(li.srs.lastReviewed||li.srs.dueDate||'0');
+              merged.srs=fd2>ld2?fi.srs:li.srs; // keep more recently reviewed
+            }else if(fi.srs&&!li.srs){merged.srs=fi.srs;}
+            lm.set(fi.id,merged);
+          }else{lm.set(fi.id,fi);}
+        }
+        map.set(fd.id,{...ld,title:fd.title,items:[...lm.values()]});
+      }else{map.set(fd.id,fd);}
+    }
+    D={...D,documents:[...map.values()]};saveLS();
+    toast(`✅ Merged — ${D.documents.length} docs`);
+  }
+  closeImport();importPending=null;renderHome();
+}
+function closeImport(){document.getElementById('import-ov').classList.remove('open');mergeMode='merge';selMerge('merge');}
+function confirmClear(){
+  if(confirm('Delete ALL data? Export first to keep your work.'))
+  {D=defaultData();saveLS();renderHome();toast('🗑 Cleared');}
+}
+
+// ── DOC MANAGEMENT ───────────────────────────────────────────────
+function showNewDocSheet(){document.getElementById('new-doc-ov').classList.add('open');setTimeout(()=>document.getElementById('new-doc-inp').focus(),150);}
+function closeNewDoc(){document.getElementById('new-doc-ov').classList.remove('open');document.getElementById('new-doc-inp').value='';}
+function confirmNewDoc(){
+  const t=document.getElementById('new-doc-inp').value.trim()||'Untitled';
+  const nd={id:gid(),title:t,createdAt:new Date().toISOString(),items:[{id:gid(),content:'',level:0,srs:null}]};
+  D.documents.push(nd);saveLS();closeNewDoc();openEditor(nd.id);
+}
+function showEdMenu(){document.getElementById('ed-menu-h').textContent=getDoc()?.title||'';document.getElementById('ed-menu-ov').classList.add('open');}
+function closeEdMenu(){document.getElementById('ed-menu-ov').classList.remove('open');}
+function renameDoc(){closeEdMenu();const t=prompt('New name:',getDoc()?.title||'');if(t!=null&&t.trim()){D.documents=D.documents.map(d=>d.id===curDoc?{...d,title:t.trim()}:d);saveLS();document.getElementById('ed-title').value=t.trim();}}
+function deleteDoc(){closeEdMenu();if(D.documents.length<=1){toast("Can't delete last document");return;}if(!confirm(`Delete "${getDoc()?.title}"?`))return;D.documents=D.documents.filter(d=>d.id!==curDoc);saveLS();goHome();}
+
+// ── TOAST ────────────────────────────────────────────────────────
+let toastT;
+function toast(msg){const el=document.getElementById('toast');el.textContent=msg;el.classList.add('on');clearTimeout(toastT);toastT=setTimeout(()=>el.classList.remove('on'),2600);}
+
+// ── BACK BUTTON ──────────────────────────────────────────────────
+window.addEventListener('popstate',()=>{
+  if(document.getElementById('import-ov').classList.contains('open'))closeImport();
+  else if(document.getElementById('new-doc-ov').classList.contains('open'))closeNewDoc();
+  else if(document.getElementById('ed-menu-ov').classList.contains('open'))closeEdMenu();
+  else if(document.getElementById('s-editor').classList.contains('active'))goHome();
+  else if(!document.getElementById('s-home').classList.contains('active'))switchTab('home');
+});
+history.pushState(null,null,location.href);
+document.getElementById('ed-content').addEventListener('touchstart',e=>{if(!e.target.closest('.item-ta'))hideFT();},{passive:true});
+</script>
+</body>
+</html>
