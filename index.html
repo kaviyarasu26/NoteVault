@@ -23,7 +23,7 @@
   --r:12px;--safe-b:env(safe-area-inset-bottom,0px);
 }
 html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--sans);overflow:hidden;-webkit-tap-highlight-color:transparent;overscroll-behavior:none;}
-#app{display:flex;flex-direction:column;height:100vh;height:100dvh;}
+#app{display:flex;flex-direction:column;height:100vh;height:100dvh;width:100%;}
 .screen{display:none;flex:1;flex-direction:column;overflow:hidden;}
 .screen.active{display:flex;}
 .hdr{display:flex;align-items:center;padding:0 14px;background:var(--bg);border-bottom:1px solid var(--border);flex-shrink:0;height:52px;gap:8px;}
@@ -43,9 +43,22 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--s
 ::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
 .fab{position:fixed;bottom:calc(62px + var(--safe-b));right:16px;width:52px;height:52px;border-radius:14px;background:var(--acc);border:none;color:#fff;font-size:26px;cursor:pointer;box-shadow:0 4px 24px var(--acc-glow);display:flex;align-items:center;justify-content:center;transition:transform .1s;z-index:50;}
 .fab:active{transform:scale(.92);}
-.doc-card{margin:8px 12px 0;background:var(--s1);border:1px solid var(--border);border-radius:var(--r);padding:14px 15px;cursor:pointer;transition:border-color .15s,background .12s;}
+
+/* Responsive Grid Layout */
+.list-container { padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+@media(min-width:640px) {
+  .list-container {
+    display: grid; 
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); 
+    gap: 16px; 
+    padding: 16px;
+  }
+}
+
+.doc-card{background:var(--s1);border:1px solid var(--border);border-radius:var(--r);padding:14px 15px;cursor:pointer;transition:border-color .15s,background .12s; position: relative;}
 .doc-card:hover,.doc-card:active{background:var(--s2);border-color:var(--border2);}
-.dc-title{font-family:var(--mono);font-size:14px;font-weight:600;color:var(--text);margin-bottom:7px;display:flex;align-items:center;gap:6px;}
+.dc-hdr{display:flex; justify-content:space-between; align-items:flex-start; gap:8px;}
+.dc-title{font-family:var(--mono);font-size:14px;font-weight:600;color:var(--text);margin-bottom:7px;display:flex;align-items:center;gap:6px;flex:1;word-break:break-word;}
 .dc-meta{font-size:11px;color:var(--t3);font-family:var(--mono);display:flex;gap:12px;flex-wrap:wrap;align-items:center;}
 .dc-due{color:var(--acc2);font-weight:600;}
 .item-row{display:flex;align-items:flex-start;position:relative;}
@@ -65,7 +78,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--s
 .tb:active,.tb:hover{background:var(--s3);color:var(--text);}
 .tb.hi{background:#0d1a3a;color:var(--acc2);border-color:#2a3a7e;}
 .tb.danger{color:var(--red);border-color:#3a1a1a;}
-.rv-wrap{padding:14px 12px;display:flex;flex-direction:column;gap:12px;}
+.rv-wrap{padding:14px 12px;display:flex;flex-direction:column;gap:12px;max-width: 600px;margin: 0 auto;}
 .rv-card{background:var(--s1);border:1px solid var(--border);border-radius:16px;padding:26px 20px;text-align:center;}
 .rv-chip{display:inline-flex;align-items:center;gap:5px;background:var(--s3);border:1px solid var(--border);border-radius:20px;padding:3px 12px;font-size:10px;font-family:var(--mono);color:var(--acc2);margin-bottom:16px;letter-spacing:.08em;text-transform:uppercase;}
 .rv-q{font-size:19px;font-weight:600;color:var(--text);line-height:1.55;}
@@ -79,7 +92,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--s
 .rate-btn:active{transform:scale(.93);}
 .pbar{height:2px;background:var(--s3);flex-shrink:0;}
 .pfill{height:100%;background:var(--acc);transition:width .35s ease;}
-.sync-section{margin:10px 12px 0;background:var(--s1);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;}
+.sync-section{margin:10px 12px 0;background:var(--s1);border:1px solid var(--border);border-radius:var(--r);overflow:hidden; max-width: 600px; margin-left: auto; margin-right: auto;}
 .sync-hdr{padding:10px 14px;font-family:var(--mono);font-size:10px;font-weight:600;color:var(--t2);text-transform:uppercase;letter-spacing:.1em;border-bottom:1px solid var(--border);background:var(--s2);}
 .sync-body{padding:8px 14px;}
 .sync-row{display:flex;align-items:center;gap:10px;padding:9px 0;}
@@ -97,21 +110,21 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--s
 .stat-cell{background:var(--s1);padding:10px 8px;text-align:center;}
 .stat-n{font-family:var(--mono);font-size:18px;font-weight:600;color:var(--text);}
 .stat-l{font-size:9px;font-family:var(--mono);color:var(--t3);text-transform:uppercase;letter-spacing:.08em;margin-top:2px;}
-.overlay{position:fixed;inset:0;background:#000a;z-index:150;display:none;align-items:flex-end;}
+.overlay{position:fixed;inset:0;background:#000a;z-index:150;display:none;align-items:center;justify-content:center;}
 .overlay.open{display:flex;}
-.sheet{background:var(--s1);border-radius:20px 20px 0 0;padding:20px 16px calc(24px + var(--safe-b));width:100%;border-top:1px solid var(--border);animation:slideUp .22s ease;}
+.sheet{background:var(--s1);border-radius:20px;padding:24px;width:90%;max-width:400px;border:1px solid var(--border);animation:slideUp .22s ease;}
 .sheet-h{font-family:var(--mono);font-size:14px;font-weight:600;color:var(--text);margin-bottom:16px;text-align:center;}
-.sheet-inp{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:13px 14px;color:var(--text);font-size:15px;outline:none;font-family:var(--sans);}
+.sheet-inp{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:13px 14px;color:var(--text);font-size:15px;outline:none;font-family:var(--sans);margin-bottom:8px;}
 .sheet-inp:focus{border-color:var(--acc);}
-.sbtn{width:100%;padding:13px;border:none;border-radius:11px;color:#fff;font-size:14px;font-weight:600;cursor:pointer;font-family:var(--mono);margin-top:9px;}
+.sbtn{width:100%;padding:13px;border:none;border-radius:11px;color:#fff;font-size:14px;font-weight:600;cursor:pointer;font-family:var(--mono);margin-top:4px;}
 .sbtn.primary{background:var(--acc);}
-.sbtn.ghost{background:transparent;border:1px solid var(--border);color:var(--t2);}
+.sbtn.ghost{background:transparent;border:1px solid var(--border);color:var(--t2);margin-top:8px;}
 .sbtn.danger{background:#1a0d0d;border:1px solid #3a1a1a;color:var(--red);}
 .merge-card{padding:12px 14px;border-radius:10px;border:2px solid var(--border);cursor:pointer;margin-bottom:8px;}
 .merge-card.sel{border-color:var(--acc);}
 .merge-card strong{font-size:13px;color:var(--text);display:block;margin-bottom:3px;}
 .merge-card span{font-size:11px;color:var(--t3);line-height:1.5;display:block;}
-.wf-guide{margin:10px 12px 0;border:1px solid var(--border);border-radius:var(--r);overflow:hidden;}
+.wf-guide{margin:10px 12px 0;border:1px solid var(--border);border-radius:var(--r);overflow:hidden; max-width: 600px; margin-left: auto; margin-right: auto;}
 .wf-hdr{padding:10px 14px;background:var(--s2);font-family:var(--mono);font-size:10px;font-weight:600;color:var(--t2);text-transform:uppercase;letter-spacing:.1em;border-bottom:1px solid var(--border);}
 .wf-body{padding:8px 14px;}
 .wf-step{display:flex;gap:10px;padding:8px 0;font-size:12px;color:var(--t2);line-height:1.5;}
@@ -128,18 +141,22 @@ code{background:var(--s3);padding:1px 5px;border-radius:4px;font-family:var(--mo
 .rv-done{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:48px 24px;text-align:center;gap:14px;}
 #toast{position:fixed;bottom:calc(66px + var(--safe-b));left:50%;transform:translateX(-50%) translateY(6px);background:var(--s2);border:1px solid var(--border2);color:var(--text);padding:9px 18px;border-radius:20px;font-size:12px;font-family:var(--mono);z-index:200;opacity:0;transition:opacity .2s,transform .2s;pointer-events:none;white-space:nowrap;max-width:92vw;text-align:center;}
 #toast.on{opacity:1;transform:translateX(-50%) translateY(0);}
-@keyframes slideUp{from{transform:translateY(40px);opacity:0}to{transform:translateY(0);opacity:1}}
+@keyframes slideUp{from{transform:translateY(20px);opacity:0}to{transform:translateY(0);opacity:1}}
 @keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
 @keyframes pulse{0%,100%{opacity:1;box-shadow:0 0 8px var(--acc)}50%{opacity:.5;box-shadow:0 0 3px var(--acc)}}
 .fade-in{animation:fadeIn .18s ease;}
-@media(min-width:640px){
-  #app{max-width:500px;margin:0 auto;box-shadow:0 0 80px #000;}
-  .fab{right:calc(50% - 250px + 16px);}
-}
 .btn-auth{padding:6px 12px;border-radius:8px;border:1px solid var(--border);background:var(--s2);color:var(--text);font-size:11px;cursor:pointer;font-family:var(--mono);transition:all .1s;}
 .btn-auth:hover{background:var(--s3);}
-.btn-back-folder{background:var(--s2);border:1px solid var(--border);color:var(--text);border-radius:10px;padding:10px 14px;margin:8px 12px 0;font-size:13px;font-family:var(--mono);cursor:pointer;display:flex;align-items:center;gap:8px;transition:background .15s;}
+.btn-back-folder{background:var(--s2);border:1px solid var(--border);color:var(--text);border-radius:10px;padding:10px 14px;margin:12px;font-size:13px;font-family:var(--mono);cursor:pointer;display:flex;align-items:center;gap:8px;transition:background .15s;}
 .btn-back-folder:hover{background:var(--s3);}
+
+/* Auth Overlay specifics */
+.pass-wrap{position:relative;width:100%;margin-bottom:8px;}
+.pass-toggle{position:absolute;right:12px;top:14px;background:none;border:none;color:var(--t3);cursor:pointer;font-size:16px;}
+.auth-links{display:flex;justify-content:space-between;font-size:12px;margin:8px 4px 16px;font-family:var(--mono);}
+.auth-link{color:var(--acc2);cursor:pointer;text-decoration:none;}
+.auth-link:hover{text-decoration:underline;}
+.btn-google{background:#fff;color:#000;display:flex;align-items:center;justify-content:center;gap:10px;}
 </style>
 </head>
 <body>
@@ -157,8 +174,13 @@ code{background:var(--s3);padding:1px 5px;border-radius:4px;font-family:var(--mo
       <span>▶</span><span id="cta-txt">Review due cards</span>
     </button>
   </div>
-  <div class="scroll" id="doc-list" style="padding-bottom:80px"></div>
-  <button class="fab" onclick="handleFabClick()" title="Create New">+</button>
+  
+  <div class="scroll" style="padding-bottom:80px">
+    <div id="back-btn-container"></div>
+    <div class="list-container" id="doc-list"></div>
+  </div>
+  
+  <button class="fab" onclick="handleFabClick()" title="Actions">+</button>
 </div>
 
 <div id="s-editor" class="screen">
@@ -209,7 +231,6 @@ code{background:var(--s3);padding:1px 5px;border-radius:4px;font-family:var(--mo
     </div>
   </div>
   <div class="scroll" style="padding-bottom:80px">
-
     <div class="sync-section">
       <div class="sync-hdr">Export Data (Save to File)</div>
       <div class="sync-body">
@@ -220,7 +241,6 @@ code{background:var(--s3);padding:1px 5px;border-radius:4px;font-family:var(--mo
         </div>
       </div>
     </div>
-
     <div class="sync-section">
       <div class="sync-hdr">Import Data (Load from File)</div>
       <div class="sync-body">
@@ -230,18 +250,16 @@ code{background:var(--s3);padding:1px 5px;border-radius:4px;font-family:var(--mo
           <button class="sync-btn btn-import" onclick="triggerImport()" title="Upload Backup">Import</button>
         </div>
       </div>
-      <input type="file" id="file-input" accept=".nvault,.json" style="display:none" onchange="handleImport(this)">
     </div>
-
     <div class="wf-guide">
       <div class="wf-hdr">Keyboard Shortcuts</div>
       <div class="wf-body">
         <div class="wf-step"><div class="wf-n">⌨️</div><div><strong style="color:var(--text)">Ctrl/Cmd + S:</strong> Instantly sync your data to the cloud.</div></div>
+        <div class="wf-step"><div class="wf-n">⌨️</div><div><strong style="color:var(--text)">Ctrl + Space:</strong> (Or Alt + /) Instantly inserts the <code>&gt;&gt;</code> flashcard separator while typing.</div></div>
         <div class="wf-step"><div class="wf-n">⌨️</div><div><strong style="color:var(--text)">Spacebar:</strong> Reveal the answer during a review session.</div></div>
         <div class="wf-step"><div class="wf-n">⌨️</div><div><strong style="color:var(--text)">1, 2, 3, 4, 5:</strong> Rate your memory recall quickly.</div></div>
       </div>
     </div>
-
     <div class="sync-section" style="margin-bottom:16px">
       <div class="sync-hdr" style="color:var(--red)">Danger Zone</div>
       <div class="sync-body">
@@ -254,6 +272,8 @@ code{background:var(--s3);padding:1px 5px;border-radius:4px;font-family:var(--mo
     </div>
   </div>
 </div>
+
+<input type="file" id="file-input" accept=".nvault,.json" style="display:none" onchange="handleImport(this)">
 
 <nav id="bnav">
   <button class="bnav-item active" id="bn-home" onclick="switchTab('home')" title="Folders">
@@ -270,6 +290,38 @@ code{background:var(--s3);padding:1px 5px;border-radius:4px;font-family:var(--mo
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="1 4 1 10 7 10"/><polyline points="23 20 23 14 17 14"/><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"/></svg>Sync
   </button>
 </nav>
+</div>
+
+<div class="overlay" id="auth-ov" onclick="if(event.target===this)closeAuth()">
+  <div class="sheet">
+    <div class="sheet-h">Sign In</div>
+    <input class="sheet-inp" id="auth-email" type="email" placeholder="Email Address (@gmail.com)"/>
+    <div class="pass-wrap">
+      <input class="sheet-inp" id="auth-pass" type="password" placeholder="Password" style="margin-bottom:0"/>
+      <button class="pass-toggle" onclick="togglePassVisibility()">👁️</button>
+    </div>
+    <div class="auth-links">
+      <span class="auth-link" onclick="handleAuthReset()">Forgot Password?</span>
+    </div>
+    <button class="sbtn primary" onclick="handleEmailLogin()">Sign In / Sign Up</button>
+    
+    <div style="text-align:center;font-size:12px;color:var(--t3);margin:16px 0;font-family:var(--mono)">OR</div>
+    
+    <button class="sbtn btn-google" onclick="handleGoogleLogin()">
+      <svg width="18" height="18" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.16v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.16C1.43 8.55 1 10.22 1 12s.43 3.45 1.16 4.93l3.68-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.16 7.07l3.68 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+      Continue with Google
+    </button>
+    <button class="sbtn ghost" onclick="closeAuth()">Cancel</button>
+  </div>
+</div>
+
+<div class="overlay" id="home-fab-ov" onclick="if(event.target===this)closeHomeFab()">
+  <div class="sheet">
+    <div class="sheet-h">Actions</div>
+    <button onclick="closeHomeFab(); document.getElementById('new-folder-ov').classList.add('open'); setTimeout(()=>document.getElementById('new-folder-inp').focus(),150);" class="sbtn primary">📁 Create New Folder</button>
+    <button onclick="closeHomeFab(); triggerImport();" class="sbtn ghost">⬇️ Import .nvault File</button>
+    <button class="sbtn ghost" style="border:none" onclick="closeHomeFab()">Cancel</button>
+  </div>
 </div>
 
 <div class="overlay" id="new-folder-ov" onclick="if(event.target===this)closeNewFolder()">
@@ -290,12 +342,29 @@ code{background:var(--s3);padding:1px 5px;border-radius:4px;font-family:var(--mo
   </div>
 </div>
 
+<div class="overlay" id="file-context-ov" onclick="if(event.target===this)closeFileMenu()">
+  <div class="sheet">
+    <div class="sheet-h" id="fc-menu-h">File Options</div>
+    <button onclick="renameFileFromHome()" style="display:flex;align-items:center;gap:10px;width:100%;background:var(--s2);border:1px solid var(--border);border-radius:11px;padding:13px 14px;color:var(--text);font-size:13px;cursor:pointer;font-family:var(--sans);text-align:left;margin-bottom:8px;">✎ Rename File</button>
+    <button onclick="exportSingleFile()" style="display:flex;align-items:center;gap:10px;width:100%;background:#0d1a3a;border:1px solid #2a3a7e;border-radius:11px;padding:13px 14px;color:var(--acc2);font-size:13px;cursor:pointer;font-family:var(--sans);text-align:left;margin-bottom:8px;">💾 Export File</button>
+    <button onclick="requestDeleteFile()" style="display:flex;align-items:center;gap:10px;width:100%;background:#1a0d0d;border:1px solid #3a1a1a;border-radius:11px;padding:13px 14px;color:var(--red);font-size:13px;cursor:pointer;font-family:var(--sans);text-align:left;">🗑 Delete File</button>
+    <button class="sbtn ghost" onclick="closeFileMenu()">Cancel</button>
+  </div>
+</div>
+
+<div class="overlay" id="delete-confirm-ov" onclick="if(event.target===this)closeDeleteConfirm()">
+  <div class="sheet">
+    <div class="sheet-h" style="color:var(--red)">Confirm Deletion</div>
+    <p id="del-conf-msg" style="text-align:center;font-size:13px;color:var(--t2);margin-bottom:16px;line-height:1.5;font-family:var(--sans);"></p>
+    <button class="sbtn danger" onclick="confirmDeleteFile()">Yes, Delete It</button>
+    <button class="sbtn ghost" onclick="closeDeleteConfirm()">Cancel</button>
+  </div>
+</div>
+
 <div class="overlay" id="ed-menu-ov" onclick="if(event.target===this)closeEdMenu()">
   <div class="sheet">
     <div class="sheet-h" id="ed-menu-h">Actions</div>
     <button onclick="reviewThisDoc()" style="display:flex;align-items:center;gap:10px;width:100%;background:var(--s2);border:1px solid var(--border);border-radius:11px;padding:13px 14px;color:var(--text);font-size:13px;cursor:pointer;font-family:var(--sans);text-align:left;margin-bottom:8px;">▶ Review this file's flashcards</button>
-    <button onclick="renameDoc()" style="display:flex;align-items:center;gap:10px;width:100%;background:var(--s2);border:1px solid var(--border);border-radius:11px;padding:13px 14px;color:var(--text);font-size:13px;cursor:pointer;font-family:var(--sans);text-align:left;margin-bottom:8px;">✎ Rename file</button>
-    <button onclick="deleteDoc()" style="display:flex;align-items:center;gap:10px;width:100%;background:#1a0d0d;border:1px solid #3a1a1a;border-radius:11px;padding:13px 14px;color:var(--red);font-size:13px;cursor:pointer;font-family:var(--sans);text-align:left;">🗑 Delete file</button>
     <button class="sbtn ghost" onclick="closeEdMenu()">Cancel</button>
   </div>
 </div>
@@ -321,7 +390,7 @@ code{background:var(--s3);padding:1px 5px;border-radius:4px;font-family:var(--mo
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-import { getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+import { getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -341,6 +410,7 @@ const provider = new GoogleAuthProvider();
 
 window.currentUser = null;
 
+// Ensure globals for Auth actions are accessible in standard script
 window.toggleAuth = async () => {
   if (window.currentUser) {
     try {
@@ -350,12 +420,68 @@ window.toggleAuth = async () => {
       toast("⚠️ Sign out failed. Try again.");
     }
   } else {
-    try {
-      await signInWithPopup(auth, provider);
-      toast("✅ Signed in securely!");
-    } catch (e) {
-      toast("⚠️ Authentication error. Please try again.");
+    document.getElementById('auth-ov').classList.add('open');
+  }
+};
+
+window.closeAuth = () => { document.getElementById('auth-ov').classList.remove('open'); };
+
+window.handleGoogleLogin = async () => {
+  try {
+    await signInWithPopup(auth, provider);
+    closeAuth();
+    toast("✅ Signed in securely with Google!");
+  } catch (e) {
+    toast("⚠️ Authentication error. Please try again.");
+  }
+};
+
+window.handleEmailLogin = async () => {
+  const email = document.getElementById('auth-email').value.trim();
+  const pass = document.getElementById('auth-pass').value;
+  
+  if (!email.endsWith('@gmail.com')) {
+    toast("⚠️ Please use a valid @gmail.com address");
+    return;
+  }
+  if (pass.length < 6) {
+    toast("⚠️ Password must be at least 6 characters");
+    return;
+  }
+
+  try {
+    // Attempt login first
+    await signInWithEmailAndPassword(auth, email, pass);
+    closeAuth();
+    toast("✅ Signed in successfully!");
+  } catch (err) {
+    // If user not found, automatically attempt signup
+    if (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential') {
+       try {
+           await createUserWithEmailAndPassword(auth, email, pass);
+           closeAuth();
+           toast("✅ Account created and signed in!");
+       } catch(createErr) {
+           toast("⚠️ Failed to create account. Check your details.");
+       }
+    } else {
+       toast("⚠️ Login failed. Incorrect password?");
     }
+  }
+};
+
+window.handleAuthReset = async () => {
+  const email = document.getElementById('auth-email').value.trim();
+  if (!email.endsWith('@gmail.com')) {
+    toast("⚠️ Enter your @gmail.com address first to reset");
+    return;
+  }
+  try {
+    await sendPasswordResetEmail(auth, email);
+    toast("✉️ Password reset email sent!");
+    closeAuth();
+  } catch (err) {
+    toast("⚠️ Failed to send reset email");
   }
 };
 
@@ -431,7 +557,14 @@ const gid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
 const today=()=>new Date().toISOString().split('T')[0];
 const esc=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 
-// --- ADVANCED SM-2 ALGORITHM WITH INTERVAL FUZZING ---
+// Password Toggle Utility
+function togglePassVisibility() {
+  const inp = document.getElementById('auth-pass');
+  if (inp.type === 'password') { inp.type = 'text'; }
+  else { inp.type = 'password'; }
+}
+
+// SM-2 Algorithm
 function sm2(q, {repetitions:r=0, easeFactor:ef=2.5, interval:iv=0} = {}) {
   let nr = r, nef = ef, ni = iv;
   if (q >= 3) {
@@ -439,27 +572,24 @@ function sm2(q, {repetitions:r=0, easeFactor:ef=2.5, interval:iv=0} = {}) {
     if (r === 0) ni = 1;
     else if (r === 1) ni = 6;
     else ni = Math.round(iv * ef);
-    
-    // Fuzzing logic: Add ±5% randomness to prevent clumped reviews
     if (ni > 5) {
       const fuzz = Math.round(ni * ((Math.random() * 0.1) - 0.05));
-      ni = Math.max(ni + fuzz, ni); // Ensure it doesn't drop below the base minimum
+      ni = Math.max(ni + fuzz, ni);
     }
   } else {
     nr = 0;
-    ni = 1; // Reset on failure
+    ni = 1; 
   }
   nef = Math.max(1.3, ef + 0.1 - (5 - q) * (0.08 + (5 - q) * 0.02));
   const d = new Date(); d.setDate(d.getDate() + ni);
   return { repetitions: nr, easeFactor: nef, interval: ni, dueDate: d.toISOString().split('T')[0] };
 }
-// -----------------------------------------------------
 
 const isFC=it=>it.content.includes('>>');
 const isDue=it=>it.srs&&it.srs.dueDate<=today();
 const parseFC=c=>{const i=c.indexOf('>>');return i<0?{q:c.trim(),a:''}:{q:c.slice(0,i).trim(),a:c.slice(i+2).trim()};};
 
-let D, curFolder=null, curDoc, focIdx=-1, rvCards=[], rvIdx=0, rvShowAns=false, importPending=null, mergeMode='merge';
+let D, curFolder=null, curDoc, focIdx=-1, rvCards=[], rvIdx=0, rvShowAns=false, importPending=null, mergeMode='merge', contextFileId=null;
 
 const loadLS=()=>{try{const r=localStorage.getItem(LS);return r?JSON.parse(r):null;}catch{return null;}};
 window.saveLS=()=>{try{localStorage.setItem(LS,JSON.stringify(D));}catch{}};
@@ -495,9 +625,7 @@ window.addEventListener('load',()=>{
   showTab('home'); 
 });
 
-// ── GLOBAL KEYBOARD SHORTCUTS ────────────────────────────────────
 window.addEventListener('keydown', e => {
-  // Review Screen Shortcuts
   if (document.getElementById('s-review').classList.contains('active') && rvCards.length > 0) {
     if (!rvShowAns && (e.code === 'Space' || e.key === 'Enter')) {
       e.preventDefault(); revealAns();
@@ -505,7 +633,6 @@ window.addEventListener('keydown', e => {
       e.preventDefault(); rate(parseInt(e.key));
     }
   }
-  // Global Save/Sync Shortcut (Ctrl+S / Cmd+S)
   if ((e.ctrlKey || e.metaKey) && e.key === 's') {
     e.preventDefault();
     window.saveLS();
@@ -513,7 +640,6 @@ window.addEventListener('keydown', e => {
   }
 });
 
-// ── NAV ──────────────────────────────────────────────────────────
 function showTab(tab){
   ['home','editor','review','search','sync'].forEach(s=>document.getElementById('s-'+s).classList.remove('active'));
   ['home','search','review','sync'].forEach(s=>{const b=document.getElementById('bn-'+s);if(b)b.classList.remove('active');});
@@ -524,7 +650,6 @@ function switchTab(tab){hideFT();if(tab==='home')renderHome();if(tab==='search')
 
 function openFolder(fId) { curFolder = fId; renderHome(); }
 function closeFolder() { curFolder = null; renderHome(); }
-
 function openEditor(id){curDoc=id;focIdx=-1;renderEditor();showTab('editor');}
 function goHome(){hideFT();renderHome();showTab('home');}
 function exitReview(){renderHome();showTab('home');}
@@ -539,7 +664,6 @@ function renderHome(){
   if(!D) return;
   const totalDue=D.documents.reduce((n,d)=>n+d.items.filter(i=>isDue(i)&&isFC(i)).length,0);
   const totalCards=D.documents.reduce((n,d)=>n+d.items.filter(i=>i.srs).length,0);
-  const totalItems=D.documents.reduce((n,d)=>n+d.items.length,0);
   document.getElementById('stat-bar').innerHTML=[
     [D.folders.length, 'Folders'], [D.documents.length,'Files'],[totalCards,'Cards'],[totalDue,'Due']
   ].map(([n,l])=>`<div class="stat-cell"><div class="stat-n" style="${l==='Due'&&n>0?'color:var(--acc2)':''}">${n}</div><div class="stat-l">${l}</div></div>`).join('');
@@ -549,10 +673,12 @@ function renderHome(){
   else{cta.style.display='none';badge.style.display='none';}
   
   const el=document.getElementById('doc-list');
+  const bbtn=document.getElementById('back-btn-container');
 
   if(!curFolder) {
+      bbtn.innerHTML='';
       if (D.folders.length === 0) {
-        el.innerHTML = '<div style="padding:40px 16px;text-align:center;font-size:13px;color:var(--t3);font-family:var(--mono)">Your vault is empty.<br><br>Tap the + button to create your first folder.</div>';
+        el.innerHTML = '<div style="grid-column: 1 / -1; padding:40px 16px;text-align:center;font-size:13px;color:var(--t3);font-family:var(--mono)">Your vault is empty.<br><br>Tap the + button to create your first folder.</div>';
         return;
       }
       el.innerHTML=D.folders.map(f=>{
@@ -565,23 +691,27 @@ function renderHome(){
             ${dueInFolder?`<span class="dc-due">⚡ ${dueInFolder} due</span>`:''}
           </div>
         </div>`;
-      }).join('')+'<div style="height:16px"></div>';
+      }).join('');
   } else {
       const folder = D.folders.find(f => f.id === curFolder);
       const docs = D.documents.filter(d => d.folderId === curFolder);
+      bbtn.innerHTML = `<button class="btn-back-folder" onclick="closeFolder()" title="Back to Folders">← Back to Folders</button>`;
       
-      let html = `<button class="btn-back-folder" onclick="closeFolder()" title="Back to Folders">← Back to Folders</button>`;
       if(docs.length === 0) {
-         html += '<div style="padding:40px 16px;text-align:center;font-size:13px;color:var(--t3);font-family:var(--mono)">This folder is empty.<br><br>Tap the + button to create a new file.</div>';
+         el.innerHTML = '<div style="grid-column: 1 / -1; padding:40px 16px;text-align:center;font-size:13px;color:var(--t3);font-family:var(--mono)">This folder is empty.<br><br>Tap the + button to create a new file.</div>';
+         return;
       }
 
-      html += docs.map(doc=>{
+      el.innerHTML = docs.map(doc=>{
         const due=doc.items.filter(i=>isDue(i)&&isFC(i)).length;
         const cards=doc.items.filter(i=>i.srs).length;
         const newC=doc.items.filter(i=>i.srs&&i.srs.repetitions===0).length;
         const sched=doc.items.filter(i=>i.srs&&!isDue(i)&&i.srs.repetitions>0).length;
         return`<div class="doc-card" onclick="openEditor('${doc.id}')" title="Open File">
-          <div class="dc-title">📄 ${esc(doc.title)}</div>
+          <div class="dc-hdr">
+             <div class="dc-title">📄 ${esc(doc.title)}</div>
+             <button class="icon-btn" style="width:28px;height:28px;margin:-4px -4px 0 0;" onclick="event.stopPropagation(); openHomeFileMenu('${doc.id}')">⋮</button>
+          </div>
           <div class="dc-meta">
             <span>${doc.items.length} items</span>
             ${cards?`<span>${cards} cards</span>`:''}
@@ -590,15 +720,15 @@ function renderHome(){
             ${sched?`<span style="color:var(--green)">✓ ${sched} sched</span>`:''}
           </div>
         </div>`;
-      }).join('')+'<div style="height:16px"></div>';
-      el.innerHTML = html;
+      }).join('');
   }
 }
 
 function handleFabClick() {
-    if(!curFolder) { document.getElementById('new-folder-ov').classList.add('open'); setTimeout(()=>document.getElementById('new-folder-inp').focus(),150); }
+    if(!curFolder) { document.getElementById('home-fab-ov').classList.add('open'); }
     else { document.getElementById('new-doc-ov').classList.add('open'); setTimeout(()=>document.getElementById('new-doc-inp').focus(),150); }
 }
+function closeHomeFab() { document.getElementById('home-fab-ov').classList.remove('open'); }
 
 // ── EDITOR ───────────────────────────────────────────────────────
 function getDoc(){return D.documents.find(d=>d.id===curDoc);}
@@ -622,7 +752,7 @@ function renderEditor(){
       >${esc(it.content)}</textarea>
       <div class="fc-bd" data-i="${i}">${badge}</div>
     </div>`;
-  }).join('')+'<div class="hint"><code>Q &gt;&gt; A</code> creates a flashcard. <br>Shortcuts: <code>Ctrl+Enter</code> to add item, <code>Ctrl+S</code> to sync.</div>';
+  }).join('')+'<div class="hint"><code>Ctrl+Space</code>: Insert Flashcard symbol (>>). <br><code>Ctrl+S</code>: Sync manually.</div>';
   setTimeout(resizeAll,30);
 }
 function resizeAll(){document.querySelectorAll('.item-ta').forEach(resize);}
@@ -644,9 +774,21 @@ function onInput(el,i){
   el.classList.toggle('fc',isFC(it));
 }
 function onFocus(i){focIdx=i;showFT();}
+
+// Listen for flashcard shortcut (Ctrl+Space or Alt+/)
 function onKey(e,i){
   if(e.key==='Enter'&&!e.shiftKey){
     e.preventDefault();tbNewAt(i);
+  }
+  // Inject ` >> ` at cursor with keyboard shortcut
+  if ((e.ctrlKey && e.code === 'Space') || (e.altKey && e.key === '/')) {
+    e.preventDefault();
+    const t = e.target;
+    const s = t.selectionStart;
+    const v = t.value;
+    t.value = v.substring(0, s) + " >> " + v.substring(t.selectionEnd);
+    onInput(t, i);
+    t.selectionStart = t.selectionEnd = s + 4;
   }
 }
 
@@ -776,23 +918,37 @@ function doSearch(q){
   }).join('');
 }
 
-// ── FILE EXPORT ──────────────────────────────────────────────────
-function buildExport(cardsOnly){
+// ── FILE EXPORT / IMPORT ─────────────────────────────────────────
+function buildExport(singleDocId = null){
+  if(singleDocId) {
+      const doc = D.documents.find(d => d.id === singleDocId);
+      const folder = D.folders.find(f => f.id === doc.folderId) || {id: doc.folderId, name: 'Exported File'};
+      return JSON.stringify({
+        version: 4, exportedAt: new Date().toISOString(),
+        folders: [folder], documents: [doc]
+      }, null, 2);
+  }
   return JSON.stringify({
-    version: 4,
-    exportedAt:new Date().toISOString(),
-    folders: D.folders || [],
-    documents:cardsOnly
-      ?D.documents.map(d=>({...d,items:d.items.filter(i=>i.srs)}))
-      :D.documents
+    version: 4, exportedAt: new Date().toISOString(),
+    folders: D.folders || [], documents: D.documents
   },null,2);
 }
+
 function dlFile(content,name){
   const a=document.createElement('a');
   a.href=URL.createObjectURL(new Blob([content],{type:'application/json'}));
   a.download=name;document.body.appendChild(a);a.click();document.body.removeChild(a);
 }
-function exportFile(){dlFile(buildExport(false),`notevault-${today()}.nvault`);toast('💾 Exported Successfully!');}
+
+function exportFile(){dlFile(buildExport(null),`notevault-${today()}.nvault`);toast('💾 Exported All Successfully!');}
+function exportSingleFile(){
+  closeFileMenu();
+  if(!contextFileId) return;
+  const doc = D.documents.find(d => d.id === contextFileId);
+  const safeName = doc.title.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+  dlFile(buildExport(contextFileId), `${safeName}-${today()}.nvault`);
+  toast('💾 File Exported');
+}
 
 function triggerImport(){document.getElementById('file-input').click();}
 function handleImport(input){
@@ -830,7 +986,6 @@ function selMerge(mode){
 
 function confirmImport(){
   if(!importPending)return;
-  
   if(mergeMode==='replace'){
     D={...D, folders: importPending.folders, documents: importPending.documents}; 
     saveLS();
@@ -890,8 +1045,38 @@ function confirmNewDoc(){
 
 function showEdMenu(){document.getElementById('ed-menu-h').textContent=getDoc()?.title||'';document.getElementById('ed-menu-ov').classList.add('open');}
 function closeEdMenu(){document.getElementById('ed-menu-ov').classList.remove('open');}
-function renameDoc(){closeEdMenu();const t=prompt('New name:',getDoc()?.title||'');if(t!=null&&t.trim()){D.documents=D.documents.map(d=>d.id===curDoc?{...d,title:t.trim()}:d);saveLS();document.getElementById('ed-title').value=t.trim(); toast('✎ Renamed');}}
-function deleteDoc(){closeEdMenu();if(D.documents.length<=1){toast("⚠️ Can't delete the only file");return;}if(!confirm(`Delete file "${getDoc()?.title}"?`))return;D.documents=D.documents.filter(d=>d.id!==curDoc);saveLS();goHome(); toast('🗑 File deleted');}
+
+// File Menu Actions (from Home Screen)
+function openHomeFileMenu(docId) {
+  contextFileId = docId;
+  const doc = D.documents.find(d => d.id === docId);
+  document.getElementById('fc-menu-h').textContent = doc.title;
+  document.getElementById('file-context-ov').classList.add('open');
+}
+function closeFileMenu() { document.getElementById('file-context-ov').classList.remove('open'); }
+
+function renameFileFromHome() {
+  closeFileMenu();
+  const doc = D.documents.find(d => d.id === contextFileId);
+  const t = prompt('New name:', doc.title);
+  if(t != null && t.trim()){
+    D.documents = D.documents.map(d => d.id === contextFileId ? {...d, title: t.trim()} : d);
+    saveLS(); renderHome(); toast('✎ File Renamed');
+  }
+}
+
+function requestDeleteFile() {
+  closeFileMenu();
+  const doc = D.documents.find(d => d.id === contextFileId);
+  document.getElementById('del-conf-msg').innerHTML = `Are you sure you want to delete <strong>"${esc(doc.title)}"</strong>?<br><br>This action cannot be undone.`;
+  document.getElementById('delete-confirm-ov').classList.add('open');
+}
+function closeDeleteConfirm() { document.getElementById('delete-confirm-ov').classList.remove('open'); }
+function confirmDeleteFile() {
+  closeDeleteConfirm();
+  D.documents = D.documents.filter(d => d.id !== contextFileId);
+  saveLS(); renderHome(); toast('🗑 File deleted');
+}
 
 // ── TOAST ────────────────────────────────────────────────────────
 let toastT;
@@ -903,6 +1088,10 @@ window.addEventListener('popstate',()=>{
   else if(document.getElementById('new-doc-ov').classList.contains('open'))closeNewDoc();
   else if(document.getElementById('new-folder-ov').classList.contains('open'))closeNewFolder();
   else if(document.getElementById('ed-menu-ov').classList.contains('open'))closeEdMenu();
+  else if(document.getElementById('home-fab-ov').classList.contains('open'))closeHomeFab();
+  else if(document.getElementById('file-context-ov').classList.contains('open'))closeFileMenu();
+  else if(document.getElementById('delete-confirm-ov').classList.contains('open'))closeDeleteConfirm();
+  else if(document.getElementById('auth-ov').classList.contains('open'))closeAuth();
   else if(document.getElementById('s-editor').classList.contains('active'))goHome();
   else if(curFolder && document.getElementById('s-home').classList.contains('active')) closeFolder();
   else if(!document.getElementById('s-home').classList.contains('active'))switchTab('home');
