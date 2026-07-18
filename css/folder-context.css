@@ -1,0 +1,13 @@
+/* Folder Context Menu — ⋮ trigger button on folder cards */
+.dc-menu-btn{background:none;border:none;color:var(--t3);}
+.dc-menu-btn:hover,.dc-menu-btn:active{color:var(--text);}
+
+/* Favorited folders section on Home */
+.fav-section{margin-top:10px;}
+.fav-hdr{padding:0 16px;font-family:var(--mono);font-size:10px;font-weight:600;color:var(--t2);text-transform:uppercase;letter-spacing:.1em;margin-bottom:2px;display:flex;align-items:center;gap:6px;}
+.fav-hdr svg{color:var(--yellow);flex-shrink:0;}
+
+/* Favorite star toggle — filled when active, outline otherwise */
+.fav-star{color:var(--yellow);}
+.fav-star.on{fill:currentColor;}
+.fav-star.off{fill:none;stroke:currentColor;stroke-width:2;}
