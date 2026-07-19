@@ -110,7 +110,6 @@ function clearAllNotifications(){
 window.clearAllNotifications = clearAllNotifications;
 
 // ── DAILY REMINDER / STREAK WARNING (feeds the inbox, once per day) ─
-const REMINDER_LS_KEY = 'nv_last_reminder';
 function prevDay(ds){ const d=new Date(ds); d.setDate(d.getDate()-1); return d.toISOString().split('T')[0]; }
 
 const TASK_REMINDERS = ['Complete daily task.', 'Do it today.', 'Daily five minute tune your goal.'];
@@ -119,16 +118,15 @@ const STREAK_WARNINGS = ["Don't skip for two days.", 'Streak is breaking.'];
 function checkDailyReminder(){
   if(!D) return;
   const t = today();
-  let last = null;
-  try{ last = localStorage.getItem(REMINDER_LS_KEY); }catch{}
-  if(last===t) return;
+  if(D.lastReminderDate===t) return;
 
   const totalDue = D.documents.reduce((n,d)=>n+d.items.filter(i=>isDue(i)&&isFC(i)).length,0);
   if(totalDue>0){
     const hour = new Date().getHours();
     const msg = hour>=22 ? "Last 2hr to complete today's task." : TASK_REMINDERS[Math.floor(Math.random()*TASK_REMINDERS.length)];
     pushNotification('📚','Task Reminder',msg);
-    try{ localStorage.setItem(REMINDER_LS_KEY, t); }catch{}
+    D.lastReminderDate = t;
+    saveLS();
     return;
   }
 
@@ -136,7 +134,8 @@ function checkDailyReminder(){
   if(streakActive){
     const msg = STREAK_WARNINGS[Math.floor(Math.random()*STREAK_WARNINGS.length)];
     pushNotification('🔥','Streak Warning',msg);
-    try{ localStorage.setItem(REMINDER_LS_KEY, t); }catch{}
+    D.lastReminderDate = t;
+    saveLS();
   }
 }
 

@@ -104,6 +104,17 @@ window.closeAuth = () => {
   if (window.resetAuthFields) window.resetAuthFields();
 };
 
+// Sign-in is mandatory — the ✕ button and backdrop click (index.html) both
+// route through this instead of closeAuth() directly, so a signed-out visitor
+// can't dismiss the gate and see an empty, unauthenticated app underneath.
+// (closeAuth() itself stays unconditional because the app's own success
+// handlers — handleSignIn, checkVerifiedAndContinue — call it at a point
+// before window.currentUser has been assigned by onAuthStateChanged.)
+window.attemptCloseAuthDismiss = () => {
+  if (!window.currentUser) return;
+  window.closeAuth();
+};
+
 // Firestore is the ONLY source of truth for a signed-in account — this never
 // reads localStorage, so switching between accounts on the same device can
 // never mix one account's notes into another's.
@@ -273,7 +284,10 @@ onAuthStateChanged(auth, async (user) => {
 
   if (user && !verified) {
     updateProfileButtons('pending');
-    D = loadLS() || defaultData();
+    // Nothing to show until they verify — Firestore is the only source of
+    // truth and loadUserData() requires a verified user.
+    D = null;
+    window.openAuthOverlay('pending');
   } else if (verified) {
     await loadUserData(user);
     updateProfileButtons('verified'); // after loadUserData so D.avatar is available
@@ -282,7 +296,11 @@ onAuthStateChanged(auth, async (user) => {
     // Leaving a signed-in account — don't leave curFolder pointing at a
     // folder id from that account's (now unloaded) data.
     if (wasSignedIn) curFolder = null;
-    D = loadLS() || defaultData();
+    // Sign-in is mandatory: no local vault, no guest mode. Force the gate
+    // open — this also covers the very first load, before anyone has
+    // touched the profile icon.
+    D = null;
+    window.openAuthOverlay('signin');
   }
   renderHome();
   if (window.renderNotificationBell) renderNotificationBell();
@@ -290,31 +308,24 @@ onAuthStateChanged(auth, async (user) => {
 });
 
 let syncTimeout = null;
-const baseSaveLS = window.saveLS;
 
+// Firestore is the only persistence layer — there's no local/guest fallback,
+// since the app requires a verified sign-in before D exists at all.
 window.saveLS = () => {
-  if (window.currentUser) {
-    // Signed in: Firestore is the only place this gets written. Skipping the
-    // local mirror here is what stops two different accounts, signed into
-    // the same browser one after another, from ever bleeding into each other.
-    clearTimeout(syncTimeout);
-    syncTimeout = setTimeout(async () => {
-      try {
-        const secretKey = window.currentUser.uid + "-nv-secret";
-        const encryptedData = CryptoJS.AES.encrypt(JSON.stringify(D), secretKey).toString();
+  if (!window.currentUser) return;
+  clearTimeout(syncTimeout);
+  syncTimeout = setTimeout(async () => {
+    try {
+      const secretKey = window.currentUser.uid + "-nv-secret";
+      const encryptedData = CryptoJS.AES.encrypt(JSON.stringify(D), secretKey).toString();
 
-        await setDoc(doc(db, "users", window.currentUser.uid), {
-            vault: encryptedData,
-            updatedAt: new Date().toISOString()
-        });
-      } catch (e) {
-        console.error("Cloud synchronisation dropped:", e);
-        toast("⚠️ Cloud sync failed. Will retry later.");
-      }
-    }, 1500);
-  } else {
-    // Guest mode (never signed in, or pending email verification) — local
-    // storage is the only persistence available.
-    baseSaveLS();
-  }
+      await setDoc(doc(db, "users", window.currentUser.uid), {
+          vault: encryptedData,
+          updatedAt: new Date().toISOString()
+      });
+    } catch (e) {
+      console.error("Cloud synchronisation dropped:", e);
+      toast("⚠️ Cloud sync failed. Will retry later.");
+    }
+  }, 1500);
 };

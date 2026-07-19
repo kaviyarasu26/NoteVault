@@ -8,6 +8,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="NoteVault">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/icon.svg">
 <title>NoteVault</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
 <link rel="stylesheet" href="css/base.css">
@@ -23,7 +26,14 @@
     <div class="hdr-logo"><div class="logo-dot"></div>NoteVault</div>
     <div style="flex:1"></div>
     <div class="hdr-actions">
-      <span class="hdr-badge" id="hdr-streak-badge" title="Daily streak" style="display:none">🔥<span id="hdr-streak-num">0</span></span>
+      <span class="hdr-xp-ring" id="hdr-xp-ring" title="Daily XP goal">
+        <svg width="24" height="24" viewBox="0 0 24 24">
+          <circle cx="12" cy="12" r="9" fill="none" stroke="var(--border)" stroke-width="3"/>
+          <circle id="xp-ring-fg" cx="12" cy="12" r="9" fill="none" stroke="var(--acc2)" stroke-width="3" stroke-linecap="round" stroke-dasharray="56.5" stroke-dashoffset="56.5" transform="rotate(-90 12 12)"/>
+        </svg>
+        <span class="xp-ring-label" id="xp-ring-label">0</span>
+      </span>
+      <span class="hdr-badge" id="hdr-streak-badge" title="Daily streak — tap for a boost" style="display:none;cursor:pointer" onclick="celebrateStreak()">🔥<span id="hdr-streak-num">0</span></span>
       <span class="hdr-badge" id="hdr-perfect-badge" title="Perfect streak" style="display:none">⚡<span id="hdr-perfect-num">0</span></span>
       <div class="hdr-search" id="hdr-search-wrap">
         <input id="hdr-search-inp" class="hdr-search-inp" placeholder="Filter folders…" oninput="filterHomeFolders(this.value)"/>
@@ -46,9 +56,19 @@
     </button>
   </div>
 
+  <div id="folder-path-section" class="fp-section" style="display:none">
+    <div class="fav-hdr">▶ Up Next</div>
+    <div class="fp-strip" id="folder-path-list"></div>
+  </div>
+
   <div id="fav-section" class="fav-section" style="display:none">
     <div class="fav-hdr"><svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" stroke="none"><path d="M12 2.5l2.97 6.31 6.86.86-5.06 4.86 1.36 6.8L12 17.9l-6.13 3.43 1.36-6.8-5.06-4.86 6.86-.86z"/></svg> Favorites</div>
     <div class="list-container" id="fav-list"></div>
+  </div>
+
+  <div id="shared-section" class="fav-section" style="display:none">
+    <div class="fav-hdr"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.6" y1="10.6" x2="15.4" y2="6.4"/><line x1="8.6" y1="13.4" x2="15.4" y2="17.6"/></svg> Shared by Others</div>
+    <div class="list-container" id="shared-list"></div>
   </div>
 
   <hr class="home-hr" id="home-hr"/>
@@ -169,6 +189,10 @@
       <div class="sync-hdr">Notifications</div>
       <div class="sync-body" id="notif-status-row"></div>
     </div>
+    <div class="sync-section">
+      <div class="sync-hdr">Achievements</div>
+      <div class="sync-body" id="achievements-list"></div>
+    </div>
     <div class="wf-guide">
       <div class="wf-hdr">Keyboard Shortcuts</div>
       <div class="wf-body">
@@ -218,9 +242,9 @@
 </nav>
 </div>
 
-<div class="overlay" id="auth-ov" data-close="closeAuth" onclick="if(event.target===this)closeAuth()">
+<div class="overlay" id="auth-ov" data-close="attemptCloseAuthDismiss" onclick="if(event.target===this)attemptCloseAuthDismiss()">
   <div class="sheet auth-sheet">
-    <button class="sheet-close" onclick="closeAuth()" title="Close" aria-label="Close">✕</button>
+    <button class="sheet-close" onclick="attemptCloseAuthDismiss()" title="Close" aria-label="Close">✕</button>
 
     <div class="auth-view active" id="auth-view-signin">
       <div class="auth-hero">
@@ -444,5 +468,6 @@
 <script src="js/folder-share.js"></script>
 <script src="js/daily-tracker.js"></script>
 <script src="js/notifications.js"></script>
+<script src="js/achievements.js"></script>
 </body>
 </html>

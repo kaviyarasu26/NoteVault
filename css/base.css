@@ -103,7 +103,7 @@ input.hdr-title::placeholder{color:var(--t3);}
 .tb.hi{background:#0d1a3a;color:var(--acc2);border-color:#2a3a7e;}
 .tb.danger{color:var(--red);border-color:#3a1a1a;}
 .rv-wrap{padding:14px 12px;display:flex;flex-direction:column;gap:12px;max-width: 600px;margin: 0 auto;}
-.rv-card{background:var(--s1);border:1px solid var(--border);border-radius:16px;padding:26px 20px;text-align:center;}
+.rv-card{position:relative;background:var(--s1);border:1px solid var(--border);border-radius:16px;padding:26px 20px;text-align:center;}
 .rv-chip{display:inline-flex;align-items:center;gap:5px;background:var(--s3);border:1px solid var(--border);border-radius:20px;padding:3px 12px;font-size:10px;font-family:var(--mono);color:var(--acc2);margin-bottom:16px;letter-spacing:.08em;text-transform:uppercase;}
 .rv-test-badge{color:var(--orange);font-weight:700;}
 .rv-q{font-size:19px;font-weight:600;color:var(--text);line-height:1.55;white-space:pre-wrap;max-height:32vh;overflow-y:auto;}
@@ -144,17 +144,22 @@ input.hdr-title::placeholder{color:var(--t3);}
 .hdr-search-inp{width:0;min-width:0;opacity:0;padding:0;margin:0;border:none;background:var(--s2);color:var(--text);font-size:13px;font-family:var(--sans);border-radius:8px;outline:none;transition:width .18s ease,opacity .15s ease,padding .18s ease,margin .18s ease;}
 .hdr-search.open .hdr-search-inp{width:130px;opacity:1;padding:7px 10px;margin-right:4px;}
 .hdr-search-inp::placeholder{color:var(--t3);}
-.overlay{position:fixed;inset:0;background:#000a;z-index:150;display:none;align-items:center;justify-content:center;}
-.overlay.open{display:flex;animation:overlayFadeIn .2s ease;}
-@keyframes overlayFadeIn{from{opacity:0}to{opacity:1}}
+/* Every overlay/popup in the app (modals, sheets, anchored context menus)
+   shares this open/close transition — opacity+visibility instead of
+   display:none/flex means closing fades out smoothly instead of vanishing
+   instantly, with zero changes needed to the ~14 individual close functions
+   that just toggle the .open class. pointer-events:none while closed keeps
+   the fixed, full-viewport overlay from blocking clicks once it's invisible. */
+.overlay{position:fixed;inset:0;background:#000a;z-index:150;display:flex;align-items:center;justify-content:center;opacity:0;visibility:hidden;pointer-events:none;transition:opacity .24s ease,visibility 0s linear .24s;}
+.overlay.open{opacity:1;visibility:visible;pointer-events:auto;transition:opacity .24s ease,visibility 0s linear 0s;}
 
 /* Anchored context menus (folder/file ⋮) — a small popover pinned near the
    button that opened it, instead of a centered modal dialog. */
 .overlay.anchored{background:transparent;align-items:flex-start;justify-content:flex-start;}
-.overlay.anchored .sheet{position:absolute;width:220px;max-width:80vw;padding:10px;border-radius:14px;animation:menuPopIn .12s ease;}
+.overlay.anchored .sheet{position:absolute;width:220px;max-width:80vw;padding:10px;border-radius:14px;transition:transform .2s cubic-bezier(.2,.8,.3,1),opacity .2s ease;transform:scale(.94);opacity:0;}
+.overlay.anchored.open .sheet{transform:scale(1);opacity:1;}
 .overlay.anchored .sheet-h{font-size:12px;margin-bottom:8px;padding:0 4px;text-align:left;color:var(--t2);}
 .overlay.anchored .sbtn{margin-top:2px;padding:11px 12px;font-size:13px;text-align:left;}
-@keyframes menuPopIn{from{opacity:0;transform:scale(.96)}to{opacity:1;transform:scale(1)}}
 
 /* Review — perfect-streak victory celebration (every 5 consecutive ★) */
 .overlay.victory-ov{z-index:220;background:#000c;}
@@ -167,7 +172,8 @@ input.hdr-title::placeholder{color:var(--t3);}
 .victory-confetti{position:absolute;inset:-60px -20px auto -20px;pointer-events:none;overflow:visible;height:0;}
 .confetti-piece{position:absolute;top:-20px;width:8px;height:14px;opacity:.9;animation:confettiFall 1.8s ease-in forwards;}
 @keyframes confettiFall{to{transform:translateY(280px) rotate(540deg);opacity:0}}
-.sheet{background:var(--s1);border-radius:20px;padding:24px;width:90%;max-width:400px;border:1px solid var(--border);animation:slideUp .22s ease;}
+.sheet{background:var(--s1);border-radius:20px;padding:24px;width:90%;max-width:400px;border:1px solid var(--border);transition:transform .24s cubic-bezier(.2,.8,.3,1),opacity .24s ease;transform:translateY(20px) scale(.97);opacity:0;}
+.overlay.open .sheet{transform:translateY(0) scale(1);opacity:1;}
 .sheet-h{font-family:var(--mono);font-size:14px;font-weight:600;color:var(--text);margin-bottom:16px;text-align:center;}
 .sheet-inp{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:13px 14px;color:var(--text);font-size:15px;outline:none;font-family:var(--sans);margin-bottom:8px;}
 .sheet-inp:focus{border-color:var(--acc);}
@@ -196,7 +202,6 @@ code{background:var(--s3);padding:1px 5px;border-radius:4px;font-family:var(--mo
 .rv-done{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:48px 24px;text-align:center;gap:14px;}
 #toast{position:fixed;bottom:calc(66px + var(--safe-b));left:50%;transform:translateX(-50%) translateY(6px);background:var(--s2);border:1px solid var(--border2);color:var(--text);padding:9px 18px;border-radius:20px;font-size:12px;font-family:var(--mono);z-index:200;opacity:0;transition:opacity .2s,transform .2s;pointer-events:none;white-space:nowrap;max-width:92vw;text-align:center;}
 #toast.on{opacity:1;transform:translateX(-50%) translateY(0);}
-@keyframes slideUp{from{transform:translateY(20px);opacity:0}to{transform:translateY(0);opacity:1}}
 @keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
 @keyframes pulse{0%,100%{opacity:1;box-shadow:0 0 8px var(--acc)}50%{opacity:.5;box-shadow:0 0 3px var(--acc)}}
 .fade-in{animation:fadeIn .18s ease;}
@@ -242,4 +247,71 @@ code{background:var(--s3);padding:1px 5px;border-radius:4px;font-family:var(--mo
 .auth-primary-btn{background:linear-gradient(135deg,var(--acc),#5678f0);box-shadow:0 6px 20px var(--acc-glow);transition:transform .12s,box-shadow .12s;}
 .auth-primary-btn:hover{transform:translateY(-1px);box-shadow:0 10px 28px var(--acc-glow);}
 .auth-primary-btn:active{transform:translateY(0) scale(.98);}
+
+/* ── Review flow liveliness ─────────────────────────────────────── */
+.rv-wrap{perspective:800px;}
+@keyframes rvSlideIn{from{opacity:0;transform:translateX(28px)}to{opacity:1;transform:translateX(0)}}
+.rv-slide-in{animation:rvSlideIn .22s cubic-bezier(.2,.8,.3,1);}
+
+/* Card stays fully hidden (opacity 0, not just edge-on) through the first
+   40% of the timeline, THEN flips through — without backface-visibility:
+   hidden, rotating past 90deg renders the mirror-image backface of the same
+   content, which is what showed up as sideways/garbled text at the start. */
+@keyframes rvFlip{0%{transform:rotateX(-100deg);opacity:0}40%{transform:rotateX(-100deg);opacity:0}62%{transform:rotateX(20deg);opacity:1}84%{transform:rotateX(-6deg)}100%{transform:rotateX(0)}}
+.rv-flip{animation:rvFlip .8s cubic-bezier(.25,.7,.3,1);transform-style:preserve-3d;backface-visibility:hidden;}
+
+/* Test Mode gets its own reveal identity (a playful shake, not the "real"
+   flip) so practice visibly reads as different from a scored review — no
+   color/border change at all here, since border color is reserved for the
+   post-rating rv-flash-1..5 feedback and shouldn't appear before a rating
+   is actually picked. */
+@keyframes rvFlipTest{0%{transform:translateX(0) rotate(0)}20%{transform:translateX(-7px) rotate(-1.5deg)}40%{transform:translateX(7px) rotate(1.5deg)}60%{transform:translateX(-4px) rotate(-.8deg)}80%{transform:translateX(2px)}100%{transform:translateX(0) rotate(0)}}
+.rv-flip-test{animation:rvFlipTest .5s ease;}
+
+/* One shared flash keyframe, colored per rating via --fc — five distinct
+   colors for the five rating levels (Again/Hard/Good/Easy/Perfect), matching
+   the rate-btn colors already used on the buttons themselves. */
+@keyframes rvFlash{0%{box-shadow:0 0 0 0 transparent}30%{box-shadow:0 0 0 4px var(--fc)}100%{box-shadow:0 0 0 0 transparent}}
+.rv-flash{animation:rvFlash .32s ease;border-color:var(--fc)!important;}
+.rv-flash-1{--fc:var(--red);}
+.rv-flash-2{--fc:var(--orange);}
+.rv-flash-3{--fc:var(--green);}
+.rv-flash-4{--fc:#60a5fa;}
+.rv-flash-5{--fc:var(--acc2);}
+
+/* Party-popper burst — every single "Perfect" (5) rating, not just the
+   every-5th-in-a-row victory overlay. Fixed to the full viewport (not
+   scoped to the card) so pieces radiate outward and cover the whole screen,
+   distinct from the top-down confettiFall used by the big celebration. */
+.rv-perfect-burst{position:fixed;inset:0;pointer-events:none;overflow:hidden;z-index:210;}
+.rv-perfect-piece{position:absolute;top:50%;left:50%;opacity:1;animation:confettiBurst .95s cubic-bezier(.15,.6,.3,1) forwards;}
+@keyframes confettiBurst{0%{transform:translate(0,0) rotate(0);opacity:1}100%{transform:translate(var(--tx),var(--ty)) rotate(var(--rot));opacity:0}}
+
+.rv-breakdown{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;width:100%;max-width:340px;margin-top:4px;}
+.rv-bd-item{display:flex;flex-direction:column;align-items:center;gap:2px;font-family:var(--mono);font-size:17px;font-weight:700;}
+.rv-bd-item small{font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;font-weight:600;}
+
+/* ── Daily XP ring (header) ─────────────────────────────────────── */
+.hdr-xp-ring{position:relative;width:24px;height:24px;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;}
+#xp-ring-fg{transition:stroke-dashoffset .4s ease,stroke .2s ease;}
+.hdr-xp-ring.xp-ring-complete #xp-ring-fg{stroke:var(--green);}
+.xp-ring-label{position:absolute;font-size:7px;font-family:var(--mono);font-weight:700;color:var(--acc2);}
+.hdr-xp-ring.xp-ring-complete .xp-ring-label{color:var(--green);}
+
+/* ── Achievements (Sync screen) ─────────────────────────────────── */
+.ach-locked .sync-info strong,.ach-locked .sync-info span{color:var(--t3);}
+
+/* ── Folder "up next" path strip (Home) ─────────────────────────── */
+.fp-section{margin-top:10px;}
+.fp-strip{display:flex;align-items:center;overflow-x:auto;padding:6px 16px 10px;gap:0;-webkit-overflow-scrolling:touch;}
+.fp-node{display:flex;flex-direction:column;align-items:center;gap:5px;flex-shrink:0;cursor:pointer;width:64px;}
+.fp-dot{width:40px;height:40px;border-radius:50%;background:var(--s2);border:2px solid var(--border2);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:13px;font-weight:700;color:var(--acc2);transition:transform .12s;}
+.fp-node:active .fp-dot{transform:scale(.92);}
+.fp-dot-next{border-color:var(--acc);color:#fff;background:linear-gradient(135deg,var(--acc),#5678f0);box-shadow:0 0 0 4px var(--acc-glow);animation:victoryBounce 1.6s ease-in-out infinite;}
+.fp-name{font-size:9px;font-family:var(--mono);color:var(--t3);text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:64px;}
+.fp-connector{width:20px;height:2px;background:var(--border2);flex-shrink:0;margin-bottom:19px;}
+
+/* ── Streak badge tap (Home header) ─────────────────────────────── */
+@keyframes streakPop{0%{transform:scale(1) rotate(0)}30%{transform:scale(1.35) rotate(-10deg)}55%{transform:scale(.95) rotate(6deg)}75%{transform:scale(1.15) rotate(-3deg)}100%{transform:scale(1) rotate(0)}}
+.streak-pop{animation:streakPop .5s cubic-bezier(.34,1.56,.64,1);}
 

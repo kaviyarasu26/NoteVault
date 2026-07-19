@@ -1,4 +1,3 @@
-const LS='nv_v4';
 const gid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
 const today=()=>new Date().toISOString().split('T')[0];
 const esc=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
@@ -379,12 +378,23 @@ const parseFC=c=>{
 };
 
 let D, curFolder=null, curDoc, focIdx=-1, rvCards=[], rvIdx=0, rvShowAns=false, importPending=null, mergeMode='merge', contextFileId=null, homeFolderFilter='', folderFileFilter='', rvTestMode=false;
+// Session-local rating tally (again/hard/good/easy/perfect) — reset at the
+// start of every review/test session, shown on the end-of-session summary.
+// Never persisted: it's a per-session UI stat, not vault data.
+let rvStats={1:0,2:0,3:0,4:0,5:0,xp:0};
+// Blocks rate() from re-entering while a rating is already mid-flight (flash
+// + delayed advance) — without this, a fast double key-press/click during
+// that window could schedule two overlapping advance()s racing on the same
+// rvIdx and desync the session.
+let rvBusy=false;
 // D.perfectStreak is persisted (not a session variable) — it only resets on
 // an actual non-perfect rating, so it survives across sessions and days:
 // 10 perfect today + 5 perfect tomorrow reads as "15 in a row", not "5".
 
-const loadLS=()=>{try{const r=localStorage.getItem(LS);return r?JSON.parse(r):null;}catch{return null;}};
-window.saveLS=()=>{try{localStorage.setItem(LS,JSON.stringify(D));}catch{}};
+// Real implementation is attached by firebase-init.js (Firestore-only). This
+// placeholder only exists to guard the brief window before that deferred
+// module script runs.
+window.saveLS=()=>{};
 
 function defaultData(){
   const t=today();
@@ -404,7 +414,14 @@ function defaultData(){
     perfectStreak: 0,
     notifications: [],
     images: {},
-    avatar: null
+    avatar: null,
+    lastReminderDate: null,
+    xp: 0,
+    todayXp: 0,
+    todayXpDate: null,
+    dailyGoal: 30,
+    totalReviewed: 0,
+    badges: []
   };
 }
 
@@ -425,11 +442,27 @@ function migrateDataIfNeeded() {
     if(!Array.isArray(D.notifications)) D.notifications = [];
     if(!D.images || typeof D.images !== 'object') D.images = {};
     if(D.avatar === undefined) D.avatar = null;
+    if(D.lastReminderDate === undefined) D.lastReminderDate = null;
+    if(typeof D.xp !== 'number') D.xp = 0;
+    if(typeof D.todayXp !== 'number') D.todayXp = 0;
+    if(D.todayXpDate === undefined) D.todayXpDate = null;
+    if(typeof D.dailyGoal !== 'number') D.dailyGoal = 30;
+    if(typeof D.totalReviewed !== 'number') D.totalReviewed = 0;
+    if(!Array.isArray(D.badges)) D.badges = [];
+    if(D.todayXpDate !== today()){ D.todayXp = 0; D.todayXpDate = today(); }
+    D.folders.forEach(f=>{ if(typeof f.reviewCount !== 'number') f.reviewCount = 0; });
 }
 
+// D is populated by firebase-init.js's onAuthStateChanged handler once
+// Firebase resolves whether anyone is signed in — the app is gated behind
+// the auth overlay until then, so there's nothing to load locally here.
 window.addEventListener('load',()=>{
-  if(!D) { D=loadLS()||defaultData(); migrateDataIfNeeded(); renderHome(); }
   showTab('home');
+  // App-shell only (see sw.js) — Firebase Auth/Firestore calls are never
+  // intercepted, so this doesn't change sign-in or sync behavior at all.
+  if('serviceWorker' in navigator){
+    navigator.serviceWorker.register('sw.js').catch(e=>console.error('Service worker registration failed',e));
+  }
 });
 
 window.addEventListener('keydown', e => {
@@ -456,6 +489,9 @@ window.addEventListener('keydown', e => {
     } else if (document.getElementById('s-editor').classList.contains('active')) {
       e.preventDefault();
       goHome();
+    } else if (curFolder && document.getElementById('s-home').classList.contains('active')) {
+      e.preventDefault();
+      closeFolder();
     }
   }
   // Alt+N — jumps straight to the name-entry popup (new folder on the
@@ -492,7 +528,7 @@ function exitReview(){renderHome();showTab('home');}
 function reviewTab(){
   const cards=D.documents.flatMap(d=>d.items.filter(i=>isDue(i)&&isFC(i)).map(i=>({...i,_d:d.id})));
   if(!cards.length){toast('🎉 No cards due right now!');return;}
-  rvCards=cards;rvIdx=0;rvShowAns=false;rvTestMode=false;hideFT();renderRv();showTab('review');
+  rvCards=cards;rvIdx=0;rvShowAns=false;rvTestMode=false;rvStats={1:0,2:0,3:0,4:0,5:0,xp:0};rvBusy=false;hideFT();renderRv();showTab('review');
 }
 
 // ── TEST MODE ────────────────────────────────────────────────────
@@ -503,7 +539,7 @@ function testFolder(folderId){
   const docIds=new Set(D.documents.filter(d=>d.folderId===folderId).map(d=>d.id));
   const cards=D.documents.filter(d=>docIds.has(d.id)).flatMap(d=>d.items.filter(isFC).map(i=>({...i,_d:d.id})));
   if(!cards.length){toast('⚠️ No flashcards in this folder');return;}
-  rvCards=cards;rvIdx=0;rvShowAns=false;rvTestMode=true;hideFT();renderRv();showTab('review');
+  rvCards=cards;rvIdx=0;rvShowAns=false;rvTestMode=true;rvStats={1:0,2:0,3:0,4:0,5:0,xp:0};rvBusy=false;hideFT();renderRv();showTab('review');
 }
 window.testFolder=testFolder;
 
@@ -512,7 +548,7 @@ function testDoc(docId){
   if(!doc) return;
   const cards=doc.items.filter(isFC).map(i=>({...i,_d:docId}));
   if(!cards.length){toast('⚠️ No flashcards in this file');return;}
-  rvCards=cards;rvIdx=0;rvShowAns=false;rvTestMode=true;hideFT();renderRv();showTab('review');
+  rvCards=cards;rvIdx=0;rvShowAns=false;rvTestMode=true;rvStats={1:0,2:0,3:0,4:0,5:0,xp:0};rvBusy=false;hideFT();renderRv();showTab('review');
 }
 window.testDoc=testDoc;
 
@@ -537,6 +573,7 @@ function folderCardHTML(f){
     <div class="dc-meta">
       <span>${docs.length} files</span>
       ${dueInFolder?`<span class="dc-due">⚡ ${dueInFolder} due</span>`:''}
+      ${f.readOnly&&f.sharedFrom?`<span title="Shared by ${esc(f.sharedFrom.ownerEmail||'someone')}">🔗 ${esc(f.sharedFrom.ownerEmail||'shared')}</span>`:''}
     </div>
   </div>`;
 }
@@ -581,10 +618,13 @@ function renderHome(){
   if(hdrStreakBadge){ hdrStreakBadge.style.display=streak>0?'flex':'none'; if(hdrStreakNum) hdrStreakNum.textContent=streak; }
   const hdrPerfectBadge=document.getElementById('hdr-perfect-badge'),hdrPerfectNum=document.getElementById('hdr-perfect-num');
   if(hdrPerfectBadge){ hdrPerfectBadge.style.display=(D.perfectStreak>0)?'flex':'none'; if(hdrPerfectNum) hdrPerfectNum.textContent=D.perfectStreak; }
+  renderXpRing();
+  renderFolderPath();
 
   const el=document.getElementById('doc-list');
   const bbtn=document.getElementById('back-btn-container');
   const favSection=document.getElementById('fav-section');
+  const sharedSection=document.getElementById('shared-section');
   const homeHr=document.getElementById('home-hr');
   const searchInp=document.getElementById('hdr-search-inp');
 
@@ -603,6 +643,16 @@ function renderHome(){
         }
       }
 
+      const sharedByOthers = D.folders.filter(f=>f.readOnly && f.sharedFrom);
+      if(sharedSection){
+        if(sharedByOthers.length){
+          sharedSection.style.display='block';
+          document.getElementById('shared-list').innerHTML = sharedByOthers.map(folderCardHTML).join('');
+        } else {
+          sharedSection.style.display='none';
+        }
+      }
+
       if (D.folders.length === 0) {
         el.innerHTML = '<div style="grid-column: 1 / -1; padding:40px 16px;text-align:center;font-size:13px;color:var(--t3);font-family:var(--mono)">Your vault is empty.<br><br>Tap the + button to create your first folder.</div>';
       } else {
@@ -618,6 +668,7 @@ function renderHome(){
       }
   } else {
       if(favSection) favSection.style.display='none';
+      if(sharedSection) sharedSection.style.display='none';
       if(homeHr) homeHr.style.display='none';
       if(searchInp){ searchInp.placeholder='Filter files…'; searchInp.value=folderFileFilter; }
 
@@ -643,6 +694,79 @@ function renderHome(){
 
   if(window.renderNotificationBell) renderNotificationBell();
 }
+
+// ── DAILY XP RING (header, next to the streak badges) ──────────────
+// SVG ring circumference for r=9 (see index.html): 2*PI*9 ≈ 56.5.
+const XP_RING_CIRC = 56.5;
+function renderXpRing(){
+  if(!D) return;
+  const ring=document.getElementById('hdr-xp-ring');
+  const fg=document.getElementById('xp-ring-fg');
+  const lbl=document.getElementById('xp-ring-label');
+  if(!ring || !fg) return;
+  const goal=D.dailyGoal||30;
+  const have=D.todayXp||0;
+  const pct=Math.max(0,Math.min(1,have/goal));
+  fg.style.strokeDashoffset=String(XP_RING_CIRC*(1-pct));
+  ring.classList.toggle('xp-ring-complete', have>=goal);
+  ring.title=`${have} / ${goal} XP today`;
+  if(lbl) lbl.textContent=have>=goal?'✓':String(have);
+}
+window.renderXpRing=renderXpRing;
+
+// ── STREAK TAP (Home header) ────────────────────────────────────────
+const STREAK_HYPE = [
+  "Keep it going!",
+  "Consistency is your superpower.",
+  "Another day, another win.",
+  "Don't break the chain now!",
+  "Look at you go!",
+];
+function celebrateStreak(){
+  const streak = window.currentStreak?currentStreak():0;
+  const badge = document.getElementById('hdr-streak-badge');
+  if(badge){
+    // Restart the animation even on rapid repeat taps — removing the class
+    // and forcing a reflow (offsetWidth read) before re-adding it is the
+    // standard trick for replaying a CSS animation on the same element.
+    badge.classList.remove('streak-pop');
+    void badge.offsetWidth;
+    badge.classList.add('streak-pop');
+  }
+  const msg = streak>0
+    ? `🔥 ${streak}-day streak — ${STREAK_HYPE[Math.floor(Math.random()*STREAK_HYPE.length)]}`
+    : `Review a card today to start a streak!`;
+  toast(msg);
+}
+window.celebrateStreak = celebrateStreak;
+
+// ── FOLDER "UP NEXT" PATH STRIP ─────────────────────────────────────
+// Additive to the existing folder grid — a horizontal-scroll strip of the
+// folders with the most due cards, so it's obvious what to review next
+// without replacing the normal grid layout underneath it.
+function renderFolderPath(){
+  if(!D) return;
+  const el=document.getElementById('folder-path-list');
+  const section=document.getElementById('folder-path-section');
+  if(!el || !section) return;
+  if(curFolder){ section.style.display='none'; return; }
+  const withDue = D.folders.map(f=>{
+    const docs=D.documents.filter(d=>d.folderId===f.id);
+    const due=docs.reduce((n,d)=>n+d.items.filter(i=>isDue(i)&&isFC(i)).length,0);
+    return {f,due};
+  }).filter(x=>x.due>0).sort((a,b)=>b.due-a.due).slice(0,8);
+
+  if(!withDue.length){ section.style.display='none'; return; }
+  section.style.display='block';
+  el.innerHTML = withDue.map(({f,due},i)=>`
+    <div class="fp-node" onclick="openFolder('${f.id}');showTab('home');" title="Open ${esc(f.name)}">
+      <div class="fp-dot${i===0?' fp-dot-next':''}">${due}</div>
+      <div class="fp-name">${esc(f.name)}</div>
+    </div>
+    ${i<withDue.length-1?'<div class="fp-connector"></div>':''}
+  `).join('');
+}
+window.renderFolderPath=renderFolderPath;
 
 // Expands/collapses the inline filter box that lives in the Home header's
 // search icon slot, instead of pointing at a separate box elsewhere on the
@@ -850,17 +974,18 @@ function reviewThisDoc(){
   closeEdMenu();
   const cards=getDoc().items.filter(i=>isDue(i)&&isFC(i)).map(i=>({...i,_d:curDoc}));
   if(!cards.length){toast('⚠️ No due cards in this file');return;}
-  rvCards=cards;rvIdx=0;rvShowAns=false;rvTestMode=false;hideFT();renderRv();showTab('review');
+  rvCards=cards;rvIdx=0;rvShowAns=false;rvTestMode=false;rvStats={1:0,2:0,3:0,4:0,5:0,xp:0};rvBusy=false;hideFT();renderRv();showTab('review');
 }
-function renderRv(){
+function renderRv(dir){
   document.getElementById('rv-ctr').textContent=`${rvIdx+1} / ${rvCards.length}`;
   document.getElementById('rv-prog').style.width=`${(rvIdx/rvCards.length)*100}%`;
   const card=rvCards[rvIdx];
   const {q,a}=parseFC(card.content);
   const docName=D.documents.find(d=>d.id===card._d)?.title||'';
+  const wrapClass=dir==='in'?'rv-wrap rv-slide-in':'rv-wrap fade-in';
   document.getElementById('rv-content').innerHTML=`
-  <div class="rv-wrap fade-in">
-    <div class="rv-card">
+  <div class="${wrapClass}">
+    <div class="rv-card${rvShowAns?(rvTestMode?' rv-flip-test':' rv-flip'):''}">
       <div class="rv-chip">▶ ${esc(docName)}${rvTestMode?' · <span class="rv-test-badge">TEST MODE</span>':''}</div>
       <div class="rv-q">${toDisplayHtml(q,card.richText)}</div>
       ${!rvShowAns
@@ -880,11 +1005,15 @@ function renderRv(){
   </div>`;
 }
 function revealAns(){rvShowAns=true;renderRv();}
+
 function rate(q){
+  if(rvBusy) return;
+  rvBusy=true;
   const card=rvCards[rvIdx];
+  let newBadges=[];
 
   // Test Mode is pure practice — it must never touch the SM-2 schedule,
-  // the perfect-streak counter, or the daily-activity tracker.
+  // the perfect-streak counter, XP/badges, or the daily-activity tracker.
   if(!rvTestMode){
     const ns=sm2(q,card.srs);
     D.documents=D.documents.map(d=>{
@@ -892,31 +1021,82 @@ function rate(q){
       return{...d,items:d.items.map(it=>it.id===card.id?{...it,srs:{...ns,lastReviewed:today()}}:it)};
     });
     D.perfectStreak = q===5 ? (D.perfectStreak||0)+1 : 0;
+    D.totalReviewed = (D.totalReviewed||0)+1;
+
+    const xpGain = q>=4?10:q===3?5:2;
+    D.todayXp = (D.todayXp||0)+xpGain;
+    D.xp = (D.xp||0)+xpGain;
+    rvStats.xp += xpGain;
+
+    const owningDoc=D.documents.find(d=>d.id===card._d);
+    if(owningDoc){
+      D.folders=D.folders.map(f=>f.id===owningDoc.folderId?{...f,reviewCount:(f.reviewCount||0)+1}:f);
+      const owningFolder=D.folders.find(f=>f.id===owningDoc.folderId);
+      if(owningFolder && owningFolder.readOnly && owningFolder.sharedFrom && window.reportSharedFolderReview){
+        window.reportSharedFolderReview(owningFolder);
+      }
+    }
+
+    if(window.checkAchievements) newBadges=window.checkAchievements();
+    if(window.renderXpRing) renderXpRing();
     saveLS();
   }
 
+  rvStats[q]=(rvStats[q]||0)+1;
+
+  // Instant colored feedback (Duolingo-style) before advancing to the next
+  // card — one of 5 distinct colors, one per rating level (Again/Hard/Good/
+  // Easy/Perfect), matching the rate-btn colors. The flash needs to be
+  // visible against the card that was just rated, so it's applied here and
+  // advance() is deliberately delayed to outlast the .32s flash animation.
+  const cardEl=document.querySelector('.rv-card');
+  if(cardEl) cardEl.classList.add('rv-flash','rv-flash-'+q);
+  if(q===5) burstPerfectConfetti();
+
   const advance=()=>{
-    if(rvIdx<rvCards.length-1){rvIdx++;rvShowAns=false;renderRv();}
+    rvBusy=false;
+    if(rvIdx<rvCards.length-1){rvIdx++;rvShowAns=false;renderRv('in');}
     else{
       document.getElementById('rv-prog').style.width='100%';
       document.getElementById('rv-ctr').textContent='✓ done';
-      document.getElementById('rv-content').innerHTML=rvTestMode?`<div class="rv-done">
+      const correct=rvStats[3]+rvStats[4]+rvStats[5];
+      const accuracy=Math.round((correct/rvCards.length)*100);
+      const breakdown=`
+        <div class="rv-breakdown">
+          <div class="rv-bd-item" style="color:var(--red)">${rvStats[1]}<small>Again</small></div>
+          <div class="rv-bd-item" style="color:var(--orange)">${rvStats[2]}<small>Hard</small></div>
+          <div class="rv-bd-item" style="color:var(--green)">${rvStats[3]}<small>Good</small></div>
+          <div class="rv-bd-item" style="color:#60a5fa">${rvStats[4]}<small>Easy</small></div>
+          <div class="rv-bd-item" style="color:var(--acc2)">${rvStats[5]}<small>Perfect</small></div>
+        </div>`;
+      document.getElementById('rv-content').innerHTML=rvTestMode?`<div class="rv-done fade-in">
         <div style="font-size:56px">📝</div>
         <div style="font-family:var(--mono);font-size:20px;font-weight:700;color:var(--acc2)">Test complete!</div>
-        <div style="font-size:13px;color:var(--t2);line-height:1.6">Practiced ${rvCards.length} card${rvCards.length>1?'s':''}.<br>Nothing was saved — your review schedule is unchanged.</div>
+        <div style="font-size:13px;color:var(--t2);line-height:1.6">Practiced ${rvCards.length} card${rvCards.length>1?'s':''} · ${accuracy}% recalled.<br>Nothing was saved — your review schedule is unchanged.</div>
+        ${breakdown}
         <button onclick="exitReview()" style="background:transparent;border:1px solid var(--border);border-radius:11px;color:var(--t2);padding:10px 24px;font-size:13px;cursor:pointer;font-family:var(--mono);">Back to Notes</button>
-      </div>`:`<div class="rv-done">
+      </div>`:`<div class="rv-done fade-in">
         <div style="font-size:56px">🎉</div>
         <div style="font-family:var(--mono);font-size:20px;font-weight:700;color:var(--acc2)">Session complete!</div>
-        <div style="font-size:13px;color:var(--t2);line-height:1.6">Reviewed ${rvCards.length} card${rvCards.length>1?'s':''}.<br>Data synced to cloud backend automatically.</div>
+        <div style="font-size:13px;color:var(--t2);line-height:1.6">Reviewed ${rvCards.length} card${rvCards.length>1?'s':''} · ${accuracy}% recalled · +${rvStats.xp} XP.<br>Data synced to cloud backend automatically.</div>
+        ${breakdown}
         <button onclick="exitReview()" style="background:transparent;border:1px solid var(--border);border-radius:11px;color:var(--t2);padding:10px 24px;font-size:13px;cursor:pointer;font-family:var(--mono);">Back to Notes</button>
       </div>`;
       if(!rvTestMode && window.logTrackerToday){logTrackerToday();renderHome();}
     }
   };
 
-  if(!rvTestMode && D.perfectStreak>0 && D.perfectStreak%5===0) showVictoryCelebration(D.perfectStreak,advance);
-  else advance();
+  setTimeout(()=>{
+    // Everything in here besides advance() itself is cosmetic (toasts,
+    // notifications, the confetti overlay) — wrapped so a failure in any of
+    // it can never silently swallow the advance() call and strand the
+    // session on the same card forever.
+    try{
+      if(!rvTestMode && newBadges.length) newBadges.forEach(b=>window.announceBadge&&window.announceBadge(b));
+      if(!rvTestMode && D.perfectStreak>0 && D.perfectStreak%5===0){ showVictoryCelebration(D.perfectStreak,advance); return; }
+    }catch(e){ console.error('Post-rating celebration step failed', e); }
+    advance();
+  },q===5?720:420); // let the Perfect confetti burst (.8s) mostly play out before the card swaps
 }
 
 // ── PERFECT-STREAK VICTORY CELEBRATION ────────────────────────────
@@ -932,6 +1112,36 @@ function renderConfetti(){
     html+=`<div class="confetti-piece" style="left:${left}%;background:${color};animation-delay:${delay}s;transform:rotate(${rot}deg);"></div>`;
   }
   el.innerHTML=html;
+}
+
+// Party-popper burst for every single Perfect (5) rating — distinct from
+// showVictoryCelebration below, which is the bigger every-5th-in-a-row
+// overlay. Fixed to the full viewport (not scoped to the card) so it reads
+// as a whole-screen celebration, and never blocks/delays advance() — it's
+// purely decorative and self-removes.
+function burstPerfectConfetti(){
+  const colors=['#3d6bff','#2dd4a0','#f0a040','#e0d060','#f06080','#6d8fff'];
+  const burst=document.createElement('div');
+  burst.className='rv-perfect-burst';
+  const vw=window.innerWidth||document.documentElement.clientWidth||360;
+  const vh=window.innerHeight||document.documentElement.clientHeight||640;
+  const maxDist=Math.max(vw,vh)*0.6;
+  let html='';
+  for(let i=0;i<48;i++){
+    const angle=Math.random()*360;
+    const dist=maxDist*0.35+Math.random()*maxDist*0.65;
+    const tx=(Math.cos(angle*Math.PI/180)*dist).toFixed(1);
+    const ty=(Math.sin(angle*Math.PI/180)*dist).toFixed(1);
+    const rot=Math.round(Math.random()*720-360);
+    const color=colors[Math.floor(Math.random()*colors.length)];
+    const delay=(Math.random()*0.15).toFixed(2);
+    const w=(6+Math.random()*5).toFixed(1);
+    const h=(w*1.6).toFixed(1);
+    html+=`<div class="rv-perfect-piece" style="--tx:${tx}px;--ty:${ty}px;--rot:${rot}deg;background:${color};width:${w}px;height:${h}px;margin:${-h/2}px 0 0 ${-w/2}px;animation-delay:${delay}s;"></div>`;
+  }
+  burst.innerHTML=html;
+  document.body.appendChild(burst);
+  setTimeout(()=>burst.remove(),1100);
 }
 
 function showVictoryCelebration(count,onDone){
@@ -1347,7 +1557,14 @@ let toastT;
 function toast(msg){const el=document.getElementById('toast');el.textContent=msg;el.classList.add('on');clearTimeout(toastT);toastT=setTimeout(()=>el.classList.remove('on'),2600);}
 
 // ── BACK BUTTON ──────────────────────────────────────────────────
+// A single pushState() at load only gives the hardware/WebView back button
+// ONE entry to consume — after that first back-press, there's nothing left
+// to pop, so a WebView wrapper (Kodular, Capacitor, etc.) treats "can't go
+// back" as "exit the app." Re-pushing on every popstate keeps one guard
+// entry always available, so back never falls through to an accidental exit
+// while there's still something on-screen to close.
 window.addEventListener('popstate',()=>{
+  history.pushState(null,null,location.href);
   const openOv=document.querySelector('.overlay.open[data-close]');
   if(openOv){
     const fn=window[openOv.dataset.close];

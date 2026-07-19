@@ -26,6 +26,7 @@ let folderShareListenerUnsub = null;
 let myShareLinksUnsub = null;
 let mySharedFolderIds = new Set();
 let receivedFolderWatchers = {}; // "ownerUid_folderId" -> unsub
+let reviewReportDebounce = {};
 
 function openFolderShareOv(){
   if(!window.currentUser){ toast('⚠️ Sign in first to share a folder'); closeFolderMenu(); return; }
@@ -245,6 +246,32 @@ function leaveSharedFolder(folder){
 }
 window.leaveSharedFolder = leaveSharedFolder;
 
+// Lets the OWNER see that a shared folder is actually being used — the
+// recipient's own review count (already tracked on their local folder copy,
+// same as any other folder's f.reviewCount) is mirrored onto the
+// folder_links doc they already own from acceptFolderShare(), so the
+// owner's existing watchMyShareLinks() listener picks it up for free with
+// no new collection. Debounced the same way mirrorSharedFolder() is, so a
+// review session doesn't spam Firestore with one write per card.
+// NOTE: this assumes the folder_links security rule permits the recipient
+// to UPDATE their own link doc (not just create it during accept) — if the
+// rule only allows create, this write will silently fail (caught below)
+// and would need a console-only rule change to enable.
+function reportSharedFolderReview(folder){
+  if(!window.currentUser || !folder.sharedFrom) return;
+  const key = folder.sharedFrom.ownerUid+'_'+folder.sharedFrom.folderId+'_'+window.currentUser.uid;
+  clearTimeout(reviewReportDebounce[key]);
+  reviewReportDebounce[key] = setTimeout(async ()=>{
+    try{
+      await window.fb.updateDoc(window.fb.doc(window.db,'folder_links',key), {
+        reviewCount: folder.reviewCount||0,
+        lastReviewedAt: new Date().toISOString()
+      });
+    }catch(e){ console.error('Failed to report shared folder review activity (may need a Firestore rule update)', e); }
+  }, 2000);
+}
+window.reportSharedFolderReview = reportSharedFolderReview;
+
 // Called when the OWNER deletes a folder that was (or still is) shared.
 // Without this, a still-pending invite is never cancelled — it just sits in
 // folder_shares with status:'pending' forever, and initFolderShareListener's
@@ -325,11 +352,11 @@ function renderSharedFoldersStatus(links){
   const byFolder = {};
   links.forEach(l=>{
     if(!byFolder[l.folderId]) byFolder[l.folderId] = { name: l.folderName, recipients: [] };
-    byFolder[l.folderId].recipients.push(l.recipientEmail);
+    byFolder[l.folderId].recipients.push({ email: l.recipientEmail, reviewCount: l.reviewCount||0 });
   });
   el.innerHTML = Object.values(byFolder).map(f=>`<div class="sync-row">
     <div class="sync-ico" style="background:#0d1a1a">📁</div>
-    <div class="sync-info"><strong>${esc(f.name)}</strong><span>Shared with ${f.recipients.map(esc).join(', ')}</span></div>
+    <div class="sync-info"><strong>${esc(f.name)}</strong><span>Shared with ${f.recipients.map(r=>`${esc(r.email)}${r.reviewCount?` (${r.reviewCount} review${r.reviewCount>1?'s':''})`:''}`).join(', ')}</span></div>
   </div>`).join('');
 }
 window.renderSharedFoldersStatus = renderSharedFoldersStatus;
