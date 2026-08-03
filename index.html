@@ -17,6 +17,7 @@
 <link rel="stylesheet" href="css/folder-context.css">
 <link rel="stylesheet" href="css/daily-tracker.css">
 <link rel="stylesheet" href="css/notifications.css">
+<link rel="stylesheet" href="css/growth.css">
 </head>
 <body>
 <div id="app">
@@ -56,6 +57,8 @@
     </button>
   </div>
 
+  <div id="growth-section"></div>
+
   <div id="folder-path-section" class="fp-section" style="display:none">
     <div class="fav-hdr">▶ Up Next</div>
     <div class="fp-strip" id="folder-path-list"></div>
@@ -90,14 +93,25 @@
       <span id="ed-folder-crumb" class="ed-folder-crumb"></span>
       <input id="ed-title" class="hdr-title" placeholder="Untitled" />
     </div>
-    <button class="icon-btn" onclick="showEdMenu()" title="File Options">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><circle cx="12" cy="5" r="1.2" fill="currentColor"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/><circle cx="12" cy="19" r="1.2" fill="currentColor"/></svg>
+    <button class="icon-btn" id="read-mode-btn" onclick="toggleReadMode()" title="Toggle Read Mode">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="19" height="19"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>
+    </button>
+    <button class="icon-btn notif-bell-btn" onclick="openTodoPanel()" title="TODOs in this file">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="19" height="19"><rect x="3" y="5" width="6" height="6" rx="1"/><path d="M13 8h8"/><rect x="3" y="15" width="6" height="6" rx="1"/><path d="M13 18h8"/></svg>
+      <span class="notif-badge" id="todo-badge" style="display:none">0</span>
+    </button>
+    <button class="icon-btn" onclick="reviewThisDoc()" title="Review this file's flashcards">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><circle cx="12" cy="12" r="9"/><path d="M10 8l6 4-6 4V8z" fill="currentColor" stroke="none"/></svg>
     </button>
   </div>
   <div id="ed-readonly-banner" style="display:none;">🔒 Shared with you — read-only</div>
   <div class="scroll" id="ed-content" style="padding-bottom:130px"></div>
   <div id="ftoolbar">
     <button class="tb tb-fmt" onmousedown="event.preventDefault()" onclick="applyHighlight()" title="Highlight (Alt+H)">🖍</button>
+    <button class="tb tb-fmt" onmousedown="event.preventDefault()" onclick="applyBold()" title="Bold (Ctrl/Cmd+B)"><b>B</b></button>
+    <button class="tb tb-fmt" onmousedown="event.preventDefault()" onclick="applyItalic()" title="Italic (Ctrl/Cmd+I)"><i>I</i></button>
+    <button class="tb tb-fmt" onmousedown="event.preventDefault()" onclick="applyUnderline()" title="Underline (Ctrl/Cmd+U)"><u>U</u></button>
+    <button class="tb tb-fmt" onmousedown="event.preventDefault()" onclick="applyList()" title="List (Alt+L)">☰ List</button>
     <button class="tb" onclick="tbNew()" title="Add empty note">＋ Item</button>
     <button class="tb" onclick="tbIndent()" title="Indent list item">⇥ Indent</button>
     <button class="tb" onclick="tbOutdent()" title="Outdent list item">⇤ Outdent</button>
@@ -177,6 +191,15 @@
       </div>
     </div>
     <div class="sync-section">
+      <div class="sync-hdr">Backups</div>
+      <div class="sync-body" id="backup-list">
+        <div class="sync-row">
+          <div class="sync-ico" style="background:#1a1a0d">🗄️</div>
+          <div class="sync-info"><strong>No backups yet</strong><span>One is taken automatically each day you use the app</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="sync-section">
       <div class="sync-hdr">Shared Folders</div>
       <div class="sync-body" id="shared-folders-status">
         <div class="sync-row">
@@ -189,18 +212,29 @@
       <div class="sync-hdr">Notifications</div>
       <div class="sync-body" id="notif-status-row"></div>
     </div>
+    <div class="sync-section" id="app-lock-section" style="display:none">
+      <div class="sync-hdr">App Lock</div>
+      <div class="sync-body" id="app-lock-status"></div>
+    </div>
     <div class="sync-section">
-      <div class="sync-hdr">Achievements</div>
-      <div class="sync-body" id="achievements-list"></div>
+      <div class="sync-hdr">Garden</div>
+      <div class="sync-body" id="sync-growth-section"></div>
     </div>
     <div class="wf-guide">
       <div class="wf-hdr">Keyboard Shortcuts</div>
       <div class="wf-body">
         <div class="wf-step"><div class="wf-n">⌨️</div><div><strong style="color:var(--text)">Ctrl/Cmd + S:</strong> Instantly sync your data to the cloud.</div></div>
+        <div class="wf-step"><div class="wf-n">⌨️</div><div><strong style="color:var(--text)">Ctrl/Cmd + Z:</strong> Undo the last edit in the note editor.</div></div>
+        <div class="wf-step"><div class="wf-n">⌨️</div><div><strong style="color:var(--text)">Ctrl/Cmd + Y</strong> (or Ctrl + Shift + Z): Redo.</div></div>
         <div class="wf-step"><div class="wf-n">⌨️</div><div><strong style="color:var(--text)">Ctrl + Space:</strong> (Or Alt + /) Instantly inserts the <code>&gt;&gt;</code> flashcard separator while typing.</div></div>
-        <div class="wf-step"><div class="wf-n">⌨️</div><div><strong style="color:var(--text)">Alt + H:</strong> Highlight & bold the selected text in yellow (shown in Review & Search).</div></div>
+        <div class="wf-step"><div class="wf-n">⌨️</div><div><strong style="color:var(--text)">Tab</strong> / <strong style="color:var(--text)">Shift + Tab:</strong> Indent / outdent the current line.</div></div>
+        <div class="wf-step"><div class="wf-n">⌨️</div><div><strong style="color:var(--text)">Ctrl/Cmd + B / I / U:</strong> Bold / Italic / Underline. With text selected, formats it immediately; with just a cursor, toggles "everything I type now is formatted" until pressed again.</div></div>
+        <div class="wf-step"><div class="wf-n">⌨️</div><div><strong style="color:var(--text)">Alt + H:</strong> Highlight — same toggle behavior as Bold/Italic/Underline. Shows yellow in the editor and a distinct color in the Review answer.</div></div>
+        <div class="wf-step"><div class="wf-n">⌨️</div><div><strong style="color:var(--text)">Alt + L:</strong> Turn the current line(s) into a bullet list, or back again.</div></div>
         <div class="wf-step"><div class="wf-n">⌨️</div><div><strong style="color:var(--text)">Alt + Enter:</strong> Insert a line break within the same item (e.g. stacked terminal commands).</div></div>
         <div class="wf-step"><div class="wf-n">⌨️</div><div><strong style="color:var(--text)">Backspace</strong> at the start of an empty item deletes it and merges back to the previous one.</div></div>
+        <div class="wf-step"><div class="wf-n">⌨️</div><div><strong style="color:var(--text)">Alt + N:</strong> Jump straight to New Folder (Home) or New File (inside a folder).</div></div>
+        <div class="wf-step"><div class="wf-n">⌨️</div><div><strong style="color:var(--text)">Esc:</strong> Close the current popup, or back out one screen (folder → Home, editor → Home).</div></div>
         <div class="wf-step"><div class="wf-n">⌨️</div><div><strong style="color:var(--text)">Spacebar:</strong> Reveal the answer during a review session.</div></div>
         <div class="wf-step"><div class="wf-n">⌨️</div><div><strong style="color:var(--text)">1, 2, 3, 4, 5:</strong> Rate your memory recall quickly.</div></div>
       </div>
@@ -309,6 +343,22 @@
   </div>
 </div>
 
+<!-- Mandatory notification-permission gate. No sheet-close button and no
+     backdrop-dismiss handler on purpose — reminders are the app's core
+     feature, so a signed-in user can't skip past this the way they can
+     dismiss other sheets. See requestNotifyGate() in js/notifications.js. -->
+<div class="overlay" id="notif-gate-ov">
+  <div class="sheet auth-sheet">
+    <div class="auth-hero">
+      <div class="auth-hero-ico">🔔</div>
+      <div class="sheet-h" style="margin-bottom:4px">Enable Notifications</div>
+      <div class="auth-sub" id="notif-gate-sub">NoteVault reminds you when flashcards are due and warns you before a streak breaks — even when the app is closed. Notifications are required to continue.</div>
+    </div>
+    <button class="sbtn primary auth-primary-btn" id="notif-gate-btn" onclick="requestNotifyGate()">Enable Notifications</button>
+    <button class="sbtn ghost" id="notif-gate-recheck-btn" onclick="recheckNotifyGate()" style="display:none">I've Enabled It — Check Again</button>
+  </div>
+</div>
+
 <div class="overlay" id="home-fab-ov" data-close="closeHomeFab" onclick="if(event.target===this)closeHomeFab()">
   <div class="sheet">
     <div class="sheet-h">Actions</div>
@@ -364,6 +414,36 @@
   </div>
 </div>
 
+<div class="overlay" id="img-edit-ov" data-close="closeImageEditor" onclick="if(event.target===this)closeImageEditor()">
+  <div class="sheet">
+    <button class="sheet-close" onclick="closeImageEditor()" title="Close" aria-label="Close">✕</button>
+    <div class="sheet-h">Crop Image</div>
+    <div class="crop-stage" id="crop-stage">
+      <img id="crop-display-img" alt="">
+      <div class="crop-rect" id="crop-rect" onpointerdown="cropPointerDown(event,'move')">
+        <div class="crop-handle tl" onpointerdown="cropPointerDown(event,'tl')"></div>
+        <div class="crop-handle tr" onpointerdown="cropPointerDown(event,'tr')"></div>
+        <div class="crop-handle bl" onpointerdown="cropPointerDown(event,'bl')"></div>
+        <div class="crop-handle br" onpointerdown="cropPointerDown(event,'br')"></div>
+      </div>
+    </div>
+    <button class="sbtn primary" onclick="applyCrop()">✓ Apply Crop</button>
+    <button class="sbtn ghost" onclick="closeImageEditor()">Cancel</button>
+  </div>
+</div>
+
+<!-- Inline, Word-style resize handles + mini toolbar for a selected image —
+     position:fixed elements computed from the image's getBoundingClientRect(),
+     not children of the <img> itself (images can't have child elements). -->
+<div class="img-rh tl" id="img-rh-tl" onpointerdown="imgResizeStart(event,'tl')" style="display:none"></div>
+<div class="img-rh tr" id="img-rh-tr" onpointerdown="imgResizeStart(event,'tr')" style="display:none"></div>
+<div class="img-rh bl" id="img-rh-bl" onpointerdown="imgResizeStart(event,'bl')" style="display:none"></div>
+<div class="img-rh br" id="img-rh-br" onpointerdown="imgResizeStart(event,'br')" style="display:none"></div>
+<div id="img-inline-toolbar" style="display:none">
+  <button class="icon-btn" onclick="openCropForSelected()" title="Crop">✂</button>
+  <button class="icon-btn" onclick="removeSelectedImage()" title="Remove">🗑</button>
+</div>
+
 <div id="folder-context-ov" class="overlay" data-close="closeFolderMenu" onclick="if(event.target===this)closeFolderMenu()">
   <div class="sheet">
     <div class="sheet-h" id="folder-menu-h">Folder Options</div>
@@ -371,14 +451,6 @@
     <button class="sbtn ghost" id="folder-fav-btn" onclick="toggleFavoriteFolder()">☆ Add to Favorites</button>
     <button class="sbtn ghost" id="folder-share-btn" onclick="openFolderShareOv()">📤 Share Folder</button>
     <button class="sbtn danger" id="folder-delete-btn" onclick="requestDeleteFolder()">🗑 Delete Folder</button>
-  </div>
-</div>
-
-<div class="overlay" id="ed-menu-ov" data-close="closeEdMenu" onclick="if(event.target===this)closeEdMenu()">
-  <div class="sheet">
-    <div class="sheet-h" id="ed-menu-h">Actions</div>
-    <button onclick="reviewThisDoc()" style="display:flex;align-items:center;gap:10px;width:100%;background:var(--s2);border:1px solid var(--border);border-radius:11px;padding:13px 14px;color:var(--text);font-size:13px;cursor:pointer;font-family:var(--sans);text-align:left;margin-bottom:8px;">▶ Review this file's flashcards</button>
-    <button class="sbtn ghost" onclick="closeEdMenu()">Cancel</button>
   </div>
 </div>
 
@@ -429,12 +501,55 @@
   </div>
 </div>
 
+<div class="overlay" id="growth-detail-ov" data-close="closeGrowthDetail" onclick="if(event.target===this)closeGrowthDetail()">
+  <div class="sheet growth-detail-sheet">
+    <button class="sheet-close" onclick="closeGrowthDetail()" title="Close" aria-label="Close">✕</button>
+    <div class="sheet-h">🌳 Your Garden</div>
+    <div class="growth-tl-list" id="growth-detail-list"></div>
+  </div>
+</div>
+
 <div class="overlay" id="notif-panel-ov" data-close="closeNotifPanel" onclick="if(event.target===this)closeNotifPanel()">
   <div class="sheet notif-sheet">
     <button class="sheet-close" onclick="closeNotifPanel()" title="Close" aria-label="Close">✕</button>
     <div class="sheet-h">Notifications</div>
     <div class="notif-panel-list" id="notif-panel-list"></div>
     <button class="sbtn ghost" onclick="clearAllNotifications()">🗑 Clear All</button>
+  </div>
+</div>
+
+<div class="overlay" id="todo-panel-ov" data-close="closeTodoPanel" onclick="if(event.target===this)closeTodoPanel()">
+  <div class="sheet todo-drawer">
+    <button class="sheet-close" onclick="closeTodoPanel()" title="Close" aria-label="Close">✕</button>
+    <div class="sheet-h">TODOs in this file</div>
+    <div class="notif-panel-list" id="todo-panel-list"></div>
+  </div>
+</div>
+
+<div class="overlay" id="pin-setup-ov" data-close="closePinSetup" onclick="if(event.target===this)closePinSetup()">
+  <div class="sheet">
+    <button class="sheet-close" onclick="closePinSetup()" title="Close" aria-label="Close">✕</button>
+    <div class="sheet-h">🔒 Set App Lock PIN</div>
+    <input class="sheet-inp" id="pin-setup-inp1" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="New PIN (4-6 digits)" onkeydown="if(event.key==='Enter')document.getElementById('pin-setup-inp2').focus()"/>
+    <input class="sheet-inp" id="pin-setup-inp2" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="Confirm PIN" onkeydown="if(event.key==='Enter')confirmPinSetup()"/>
+    <button class="sbtn primary" onclick="confirmPinSetup()">Save PIN</button>
+  </div>
+</div>
+
+<!-- Mandatory re-lock gate (Android only, PIN set) — no sheet-close/backdrop
+     dismiss, same non-dismissable pattern as notif-gate-ov. See
+     js/app-lock.js. -->
+<div class="overlay" id="app-lock-gate-ov">
+  <div class="sheet auth-sheet">
+    <div class="auth-hero">
+      <div class="auth-hero-ico">🔒</div>
+      <div class="sheet-h" style="margin-bottom:4px">NoteVault Locked</div>
+      <div class="auth-sub">Enter your PIN to continue</div>
+    </div>
+    <input class="sheet-inp" id="app-lock-pin-inp" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="PIN" onkeydown="if(event.key==='Enter')checkAppLockPin()"/>
+    <button class="sbtn primary auth-primary-btn" onclick="checkAppLockPin()">Unlock</button>
+    <div id="app-lock-error" style="color:var(--red);font-size:12px;text-align:center;margin-top:8px;display:none">Incorrect PIN</div>
+    <button class="sbtn ghost" onclick="forgotPinSignOut()">Forgot PIN? Sign Out</button>
   </div>
 </div>
 
@@ -462,6 +577,14 @@
 
 <div id="toast"></div>
 
+<!-- Vendored Capacitor browser bundles (see js/capacitor/). Harmless on the
+     plain web PWA — window.Capacitor.isNativePlatform() is false outside the
+     packaged app, so notifications.js's isNative() checks skip all of this.
+     Must load before app-core.js/notifications.js, which reference
+     window.Capacitor at parse time. -->
+<script src="js/capacitor/capacitor.js"></script>
+<script src="js/capacitor/local-notifications-plugin.js"></script>
+<script src="js/capacitor/app-plugin.js"></script>
 <script type="module" src="js/firebase-init.js"></script>
 <script src="js/app-core.js"></script>
 <script src="js/folder-context.js"></script>
@@ -469,5 +592,9 @@
 <script src="js/daily-tracker.js"></script>
 <script src="js/notifications.js"></script>
 <script src="js/achievements.js"></script>
+<script src="js/growth.js"></script>
+<script src="js/app-lock.js"></script>
+<script src="js/backup.js"></script>
+<script src="js/image-editor.js"></script>
 </body>
 </html>

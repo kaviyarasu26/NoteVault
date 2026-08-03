@@ -1,0 +1,15 @@
+{
+  "appId": "com.notevault.app",
+  "appName": "NoteVault",
+  "webDir": "www",
+  "backgroundColor": "#080b12",
+  "server": {
+    "androidScheme": "https"
+  },
+  "plugins": {
+    "LocalNotifications": {
+      "smallIcon": "ic_stat_notify",
+      "iconColor": "#4c7cff"
+    }
+  }
+}

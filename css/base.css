@@ -7,13 +7,13 @@
   --text:#d4daf5;--t2:#7a85b0;--t3:#3a4570;
   --green:#2dd4a0;--red:#f06080;--orange:#f0a040;--yellow:#e0d060;
   --mono:'IBM Plex Mono',monospace;--sans:'IBM Plex Sans',sans-serif;
-  --r:12px;--safe-b:env(safe-area-inset-bottom,0px);
+  --r:12px;--safe-b:env(safe-area-inset-bottom,0px);--safe-t:env(safe-area-inset-top,0px);
 }
 html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--sans);overflow:hidden;-webkit-tap-highlight-color:transparent;overscroll-behavior:none;}
 #app{display:flex;flex-direction:column;height:100vh;height:100dvh;width:100%;}
 .screen{display:none;flex:1;flex-direction:column;overflow:hidden;}
 .screen.active{display:flex;}
-.hdr{display:flex;align-items:center;padding:0 14px;background:var(--bg);border-bottom:1px solid var(--border);flex-shrink:0;height:52px;gap:8px;}
+.hdr{display:flex;align-items:center;padding:var(--safe-t) 14px 0;background:var(--bg);border-bottom:1px solid var(--border);flex-shrink:0;height:calc(52px + var(--safe-t));gap:8px;}
 .hdr-logo{font-family:var(--mono);font-size:15px;font-weight:600;color:var(--text);display:flex;align-items:center;gap:8px;}
 .logo-dot{width:8px;height:8px;border-radius:50%;background:var(--acc);box-shadow:0 0 8px var(--acc);animation:pulse 2.5s infinite;}
 .hdr-title{font-family:var(--mono);font-size:14px;font-weight:500;color:var(--text);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
@@ -24,6 +24,7 @@ input.hdr-title::placeholder{color:var(--t3);}
 #ed-readonly-banner{display:flex;align-items:center;gap:6px;padding:8px 14px;background:#1a1a0d;border-bottom:1px solid #3a3a1a;color:var(--yellow);font-size:11px;font-family:var(--mono);flex-shrink:0;}
 .icon-btn{width:38px;height:38px;display:flex;align-items:center;justify-content:center;border-radius:9px;border:none;background:transparent;color:var(--t2);cursor:pointer;font-size:18px;flex-shrink:0;transition:background .12s,color .12s;}
 .icon-btn:active,.icon-btn:hover{background:var(--s3);color:var(--text);}
+.icon-btn.active{background:var(--acc-glow);color:var(--acc2);}
 
 /* Global header actions — notification bell + profile icon */
 .hdr-actions{display:flex;align-items:center;gap:2px;flex-shrink:0;}
@@ -36,12 +37,18 @@ input.hdr-title::placeholder{color:var(--t3);}
 
 /* Notifications open as a left-hand drawer, not a centered modal */
 #notif-panel-ov{justify-content:flex-start;align-items:stretch;}
-.notif-sheet{max-height:100%;height:100%;width:86%;max-width:360px;border-radius:0 18px 18px 0;display:flex;flex-direction:column;animation:notifDrawerIn .22s ease;}
+.notif-sheet{max-height:100%;height:100%;width:86%;max-width:360px;border-radius:0 18px 18px 0;display:flex;flex-direction:column;animation:notifDrawerIn .22s ease;padding-top:calc(24px + var(--safe-t));}
 @keyframes notifDrawerIn{from{transform:translateX(-100%)}to{transform:translateX(0)}}
 .notif-panel-list{overflow-y:auto;margin:4px 0 14px;flex:1;}
 
+/* TODOs open as a left-hand drawer too, same treatment as Notifications */
+#todo-panel-ov{justify-content:flex-start;align-items:stretch;}
+.todo-drawer{max-height:100%;height:100%;width:86%;max-width:360px;border-radius:0 18px 18px 0;display:flex;flex-direction:column;animation:notifDrawerIn .22s ease;padding-top:calc(24px + var(--safe-t));}
+.todo-item{cursor:pointer;}
+.todo-item:active{opacity:.7;}
+
 /* Profile opens anchored to the top-right corner, not centered */
-#profile-ov{justify-content:flex-end;align-items:flex-start;padding:58px 14px 0 0;}
+#profile-ov{justify-content:flex-end;align-items:flex-start;padding:calc(58px + var(--safe-t)) 14px 0 0;}
 .notif-item{display:flex;gap:10px;padding:11px 0;border-top:1px solid var(--border);}
 .notif-item:first-child{border-top:none;}
 .notif-item-ico{font-size:18px;flex-shrink:0;width:28px;text-align:center;}
@@ -111,9 +118,35 @@ input.hdr-title::placeholder{color:var(--t3);}
 .rv-a-lbl{font-size:9px;font-family:var(--mono);color:var(--green);text-transform:uppercase;letter-spacing:.15em;margin-bottom:10px;}
 .rv-a{font-size:15px;color:var(--yellow);font-weight:700;line-height:1.7;text-align:left;white-space:pre-wrap;max-height:32vh;overflow-y:auto;}
 
+/* ── Rich text formatting — see applyHighlight/applyList, app-core.js ── */
+.nv-hl{color:var(--yellow);font-weight:700;}
+/* .rv-a is already yellow+bold by default (above) — a highlight needs a
+   genuinely different color there to actually stand out against it. */
+.rv-a .nv-hl{color:var(--acc2);}
+.item-ta ul,.rv-q ul,.rv-a ul{margin:4px 0 4px 20px;padding:0;}
+.item-ta li,.rv-q li,.rv-a li{margin:2px 0;}
+
 /* Pasted images — visible inline in the editor itself, and responsive on
    both mobile and laptop widths wherever else they're shown */
-.nv-img{max-width:100%;height:auto;border-radius:8px;margin:8px 0;display:block;}
+.nv-img{max-width:100%;height:auto;border-radius:8px;margin:8px 0;display:block;cursor:pointer;}
+.nv-img-selected{outline:2px solid var(--acc2);outline-offset:2px;}
+
+/* ── Inline image resize handles + mini toolbar (Word-style) ────── */
+.img-rh{position:fixed;width:16px;height:16px;background:var(--acc2);border:2px solid #fff;border-radius:50%;z-index:60;touch-action:none;box-shadow:0 1px 4px #0006;}
+.img-rh.tl,.img-rh.br{cursor:nwse-resize;}
+.img-rh.tr,.img-rh.bl{cursor:nesw-resize;}
+#img-inline-toolbar{position:fixed;z-index:61;display:flex;gap:2px;background:var(--s2);border:1px solid var(--border);border-radius:10px;padding:2px;box-shadow:0 4px 14px #0007;}
+#img-inline-toolbar .icon-btn{width:32px;height:32px;}
+
+/* ── Crop modal ───────────────────────────────────────────────── */
+.crop-stage{position:relative;margin:0 auto 14px;max-width:100%;touch-action:none;user-select:none;}
+#crop-display-img{display:block;max-width:100%;max-height:320px;margin:0 auto;border-radius:4px;-webkit-user-drag:none;}
+.crop-rect{position:absolute;border:2px solid var(--acc2);box-shadow:0 0 0 9999px #000a;touch-action:none;}
+.crop-handle{position:absolute;width:20px;height:20px;background:var(--acc2);border-radius:50%;border:2px solid #fff;touch-action:none;}
+.crop-handle.tl{top:-10px;left:-10px;cursor:nwse-resize;}
+.crop-handle.tr{top:-10px;right:-10px;cursor:nesw-resize;}
+.crop-handle.bl{bottom:-10px;left:-10px;cursor:nesw-resize;}
+.crop-handle.br{bottom:-10px;right:-10px;cursor:nwse-resize;}
 .reveal-btn{width:100%;padding:14px;background:var(--s2);border:1px solid var(--border2);border-radius:12px;color:var(--text);font-size:14px;font-weight:600;cursor:pointer;font-family:var(--sans);transition:all .12s;}
 .reveal-btn:hover,.reveal-btn:active{background:var(--s3);}
 .rate-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;}

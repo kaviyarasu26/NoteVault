@@ -91,7 +91,13 @@ function promptIncomingFolderShare(req){
   document.getElementById('fs-incoming-msg').textContent = `${req.ownerEmail} wants to share the folder "${req.folderName}" with you.`;
   document.getElementById('fs-incoming-ov').classList.add('open');
   if(window.notifyUser) notifyUser('📥 Folder Share Invite', `${req.ownerEmail} wants to share "${req.folderName}" with you`);
-  if(window.pushNotification) window.pushNotification('📥','Folder Share Invite',`${req.ownerEmail} wants to share "${req.folderName}" with you.`);
+  // action metadata lets the notification-panel entry (renderNotifPanel,
+  // notifications.js) render its own Accept/Reject buttons — resolved
+  // through resolveNotifShareInvite() there, which calls back into
+  // acceptFolderShare(req)/rejectFolderShare(req) below with a
+  // reconstructed req, same shape as this popup uses.
+  if(window.pushNotification) window.pushNotification('📥','Folder Share Invite',`${req.ownerEmail} wants to share "${req.folderName}" with you.`,
+    { type:'folder_share_invite', shareId:req.id, ownerUid:req.ownerUid, ownerEmail:req.ownerEmail, folderId:req.folderId, folderName:req.folderName, resolved:null });
 }
 
 function closeIncomingFolderShare(){
@@ -100,10 +106,16 @@ function closeIncomingFolderShare(){
 }
 window.closeIncomingFolderShare = closeIncomingFolderShare;
 
-function rejectFolderShare(){
-  if(!incomingFolderShare) return;
-  window.fb.updateDoc(window.fb.doc(window.db,'folder_shares',incomingFolderShare.id), {status:'rejected'}).catch(e=>console.error(e));
-  closeIncomingFolderShare();
+// req is optional — omitted, it falls back to whatever invite the popup
+// overlay currently has open (its own Accept/Reject buttons call these with
+// no args, unchanged). Passed explicitly, it lets the notification panel's
+// buttons resolve an invite directly without that overlay ever opening.
+function rejectFolderShare(req){
+  const r = req || incomingFolderShare;
+  if(!r) return;
+  window.fb.updateDoc(window.fb.doc(window.db,'folder_shares',r.id), {status:'rejected'}).catch(e=>console.error(e));
+  if(r===incomingFolderShare) closeIncomingFolderShare();
+  toast('🚫 Invite declined');
 }
 window.rejectFolderShare = rejectFolderShare;
 
@@ -139,6 +151,10 @@ function ensureLocalSharedFolder(req, folderName){
 // have their content text refreshed.
 function importSharedFolder(req, data, isInitial){
   const localFolder = ensureLocalSharedFolder(req, data.folder.name);
+  // Marks that this folder has received real synced content at least once
+  // — watchSharedFolderUpdates below only trusts a later "doesn't exist" as
+  // a genuine deletion once this is true (see its comment for why).
+  if(!localFolder.everSynced) D.folders = D.folders.map(f=>f.id===localFolder.id?{...f,everSynced:true}:f);
 
   let newCardCount = 0;
   data.documents.forEach(srcDoc=>{
@@ -178,9 +194,10 @@ function importSharedFolder(req, data, isInitial){
   }
 }
 
-async function acceptFolderShare(){
-  if(!incomingFolderShare) return;
-  const req = incomingFolderShare;
+async function acceptFolderShare(req){
+  req = req || incomingFolderShare;
+  if(!req) return;
+  const openedFromPopup = req===incomingFolderShare;
   try{
     // Deterministic link doc FIRST — the shared_folders read rule depends
     // on this existing before the folder data can be read.
@@ -213,7 +230,10 @@ async function acceptFolderShare(){
     console.error('Failed to accept folder share', e);
     toast('⚠️ Failed to accept invite');
   }
-  closeIncomingFolderShare();
+  // Only close the popup if it was actually showing THIS invite — resolving
+  // a different one from the notification panel while the popup happens to
+  // be open for another invite shouldn't dismiss that unrelated popup.
+  if(openedFromPopup) closeIncomingFolderShare();
 }
 window.acceptFolderShare = acceptFolderShare;
 
@@ -221,7 +241,32 @@ function watchSharedFolderUpdates(req){
   const key = req.ownerUid+'_'+req.folderId;
   if(receivedFolderWatchers[key]) receivedFolderWatchers[key]();
   receivedFolderWatchers[key] = window.fb.onSnapshot(window.fb.doc(window.db,'shared_folders',key), snap=>{
-    if(!snap.exists()) return;
+    if(!snap.exists()){
+      // Firestore's onSnapshot always delivers the CURRENT state immediately
+      // on subscribe — so if the owner simply hasn't mirrored this folder
+      // yet (they were offline when the invite was accepted, or still are),
+      // THIS callback's very first delivery legitimately has exists:false,
+      // milliseconds after acceptFolderShare's own getDoc() found the same
+      // thing and left a placeholder folder waiting (ensureLocalSharedFolder).
+      // Treating that as "the owner deleted it" wiped the placeholder the
+      // instant it was created — every single accept of an invite from an
+      // offline owner self-destructed, and every reload
+      // (resubscribeReceivedFolders) re-triggered it for any folder still
+      // waiting on its first sync. Only trust "doesn't exist" as a REAL
+      // deletion once this folder has actually received synced content
+      // before (localFolder.everSynced, set by importSharedFolder) —
+      // otherwise this is just "still waiting," not "was removed."
+      // "Has synced before" also counts folders synced before this fix
+      // existed (no everSynced flag yet, but real documents already there)
+      // — no data migration needed, this just recognizes it retroactively.
+      const localFolder = D && D.folders.find(f=>f.sharedFrom && f.sharedFrom.ownerUid===req.ownerUid && f.sharedFrom.folderId===req.folderId);
+      const hasSyncedBefore = localFolder && (localFolder.everSynced || D.documents.some(d=>d.folderId===localFolder.id));
+      if(hasSyncedBefore){
+        delete receivedFolderWatchers[key];
+        removeLocalSharedFolder(req.ownerUid, req.folderId, req.folderName);
+      }
+      return;
+    }
     try{
       const data = decryptSharedFolder(snap.data(), req.ownerUid);
       importSharedFolder(req, data, false);
@@ -238,11 +283,32 @@ function resubscribeReceivedFolders(){
   });
 }
 
+// Removes a recipient's local read-only copy of a shared folder. The single
+// place both "I left it myself" (leaveSharedFolder) and "the owner
+// unshared/deleted it" (watchSharedFolderUpdates's !snap.exists() branch,
+// below) route through — previously NEITHER path touched D.folders/
+// D.documents, so a shared folder the recipient saw once stayed in their
+// vault forever (just frozen, disconnected from live updates), which is the
+// "I removed it but it's still showing" bug.
+function removeLocalSharedFolder(ownerUid, folderId, folderName){
+  if(!D) return;
+  const localFolder = D.folders.find(f=>f.sharedFrom && f.sharedFrom.ownerUid===ownerUid && f.sharedFrom.folderId===folderId);
+  if(!localFolder) return;
+  D.documents = D.documents.filter(d=>d.folderId!==localFolder.id);
+  D.folders = D.folders.filter(f=>f.id!==localFolder.id);
+  if(typeof curFolder!=='undefined' && curFolder===localFolder.id) curFolder=null;
+  saveLS();
+  if(window.renderHome) renderHome();
+  if(window.pushNotification) pushNotification('📪','Folder removed', `"${folderName||localFolder.name}" was unshared and removed from your vault.`);
+}
+window.removeLocalSharedFolder = removeLocalSharedFolder;
+
 function leaveSharedFolder(folder){
   if(!folder.sharedFrom || !window.currentUser) return;
   const key = folder.sharedFrom.ownerUid+'_'+folder.sharedFrom.folderId;
   if(receivedFolderWatchers[key]){ receivedFolderWatchers[key](); delete receivedFolderWatchers[key]; }
   window.fb.deleteDoc(window.fb.doc(window.db,'folder_links',key+'_'+window.currentUser.uid)).catch(e=>console.error(e));
+  removeLocalSharedFolder(folder.sharedFrom.ownerUid, folder.sharedFrom.folderId, folder.name);
 }
 window.leaveSharedFolder = leaveSharedFolder;
 
@@ -293,6 +359,17 @@ async function cancelSharesForFolder(folderId){
       .filter(d=>d.data().status==='pending')
       .map(d=>window.fb.deleteDoc(d.ref)));
 
+    // shared_folders BEFORE folder_links, deliberately — per your Firestore
+    // rules, a recipient's read access to shared_folders/{ownerUid}_{folderId}
+    // is authorized by exists(folder_links/{...}). Deleting folder_links
+    // first would revoke that access while shared_folders still exists,
+    // which turns the recipient's live onSnapshot listener into a
+    // permission-denied error instead of a clean "document deleted" event —
+    // and removeLocalSharedFolder() only runs on the clean path (see
+    // watchSharedFolderUpdates). This order keeps their read valid for the
+    // instant that matters, so they get the real deletion event.
+    await window.fb.deleteDoc(window.fb.doc(window.db,'shared_folders',window.currentUser.uid+'_'+folderId)).catch(()=>{});
+
     const linksQ = window.fb.query(
       window.fb.collection(window.db,'folder_links'),
       window.fb.where('ownerUid','==',window.currentUser.uid),
@@ -300,20 +377,40 @@ async function cancelSharesForFolder(folderId){
     );
     const linksSnap = await window.fb.getDocs(linksQ);
     await Promise.all(linksSnap.docs.map(d=>window.fb.deleteDoc(d.ref)));
-
-    await window.fb.deleteDoc(window.fb.doc(window.db,'shared_folders',window.currentUser.uid+'_'+folderId)).catch(()=>{});
   }catch(e){ console.error('Failed to cancel shares for deleted folder', e); }
 }
 window.cancelSharesForFolder = cancelSharesForFolder;
 
 // ── OWNER: mirror shared folders so recipients see updates ──────
+// Keyed by folderId+recipientUid, remembered across snapshots purely so the
+// callback below can tell "a recipient who was here is now gone" from "this
+// is just the first load" — Firestore's onSnapshot hands us the full
+// current list each time, not a diff, so the diffing has to happen here.
+let prevShareLinksByKey = new Map();
+
 function watchMyShareLinks(){
   if(myShareLinksUnsub){ myShareLinksUnsub(); myShareLinksUnsub=null; }
   mySharedFolderIds = new Set();
+  prevShareLinksByKey = new Map();
   if(!window.currentUser || !window.fb) return;
   const q = window.fb.query(window.fb.collection(window.db,'folder_links'), window.fb.where('ownerUid','==',window.currentUser.uid));
   myShareLinksUnsub = window.fb.onSnapshot(q, snap=>{
     const links = snap.docs.map(d=>d.data());
+    const nowByKey = new Map(links.map(l=>[l.folderId+'::'+l.recipientUid, l]));
+
+    // A recipient present last snapshot but missing now just revoked their
+    // own access (leaveSharedFolder deletes their own link doc) — notify
+    // the owner locally. No server/push infra needed: this device already
+    // holds a live Firestore listener on exactly this data.
+    if(prevShareLinksByKey.size){
+      prevShareLinksByKey.forEach((oldLink,key)=>{
+        if(!nowByKey.has(key) && window.pushNotification){
+          pushNotification('🔓','Access removed', `${oldLink.recipientEmail} removed their access to "${oldLink.folderName}".`);
+        }
+      });
+    }
+    prevShareLinksByKey = nowByKey;
+
     mySharedFolderIds = new Set(links.map(l=>l.folderId));
     renderSharedFoldersStatus(links);
     mirrorAllSharedFolders();

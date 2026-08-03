@@ -1,0 +1,14 @@
+# Firebase admin credentials — full read/write access to the whole
+# database, bypassing security rules entirely. Never commit this.
+serviceAccountKey.json
+*-firebase-adminsdk-*.json
+firestore-export-*.json
+
+# Capacitor/Android build output — regenerated on demand via
+# `npm run build:apk` (see scripts/), not source.
+node_modules/
+www/
+android/
+*.apk
+
+package-lock.json

@@ -1,0 +1,30 @@
+/* Growth Garden — Home screen section + detail timeline overlay */
+.growth-card{display:flex;align-items:center;gap:14px;margin:10px 12px 0;padding:14px;background:var(--s1);border:1px solid var(--border);border-radius:var(--r);cursor:pointer;transition:border-color .15s;max-width:600px;margin-left:auto;margin-right:auto;}
+.growth-card:hover,.growth-card:active{border-color:var(--border2);}
+.growth-illustration{flex-shrink:0;width:96px;height:70px;display:flex;align-items:flex-end;justify-content:center;}
+.growth-illustration svg{animation:growthFloat 4s ease-in-out infinite;}
+@keyframes growthFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
+.growth-info{flex:1;min-width:0;}
+.growth-stage-name{font-family:var(--mono);font-size:14px;font-weight:700;color:var(--text);margin-bottom:6px;}
+.growth-bar{height:6px;border-radius:3px;background:var(--s3);overflow:hidden;margin-bottom:5px;}
+.growth-bar-fg{height:100%;background:linear-gradient(90deg,var(--green),var(--acc2));border-radius:3px;transition:width .5s ease;}
+.growth-progress-label{font-size:11px;color:var(--t3);font-family:var(--mono);}
+.growth-progress-label.growth-maxed{color:var(--yellow);}
+/* Same card, reused inside the Sync tab's "Garden" section (.sync-body
+   already has its own padding — drop the card's own top margin so it
+   doesn't double up). */
+.sync-body .growth-card{margin-top:0;}
+
+/* Detail/timeline overlay — centered modal, scrollable. Plain .sheet has no
+   max-height/overflow by default (base.css), so both are set here for this
+   variant instead of relying on the drawer pattern used elsewhere. */
+.growth-detail-sheet{max-height:78vh;display:flex;flex-direction:column;}
+.growth-tl-list{overflow-y:auto;flex:1;margin:4px 0 0;}
+.growth-tl-item{display:flex;align-items:center;gap:12px;padding:10px 0;border-top:1px solid var(--border);}
+.growth-tl-item:first-child{border-top:none;}
+.growth-tl-ico{width:56px;height:56px;flex-shrink:0;display:flex;align-items:center;justify-content:center;}
+.growth-tl-lock{font-size:20px;opacity:.5;}
+.growth-tl-info{display:flex;flex-direction:column;gap:2px;min-width:0;}
+.growth-tl-info strong{font-size:13px;color:var(--text);}
+.growth-tl-info span{font-size:11px;color:var(--t2);font-family:var(--mono);}
+.growth-tl-divider{padding:14px 0 6px;font-family:var(--mono);font-size:10px;font-weight:600;color:var(--t2);text-transform:uppercase;letter-spacing:.1em;}

@@ -13,12 +13,16 @@ const SHELL_ASSETS = [
   './css/folder-context.css',
   './css/daily-tracker.css',
   './css/notifications.css',
+  './css/growth.css',
   './js/app-core.js',
   './js/folder-context.js',
   './js/folder-share.js',
   './js/daily-tracker.js',
   './js/notifications.js',
   './js/achievements.js',
+  './js/growth.js',
+  './js/app-lock.js',
+  './js/backup.js',
   './js/firebase-init.js',
   './icons/icon.svg'
 ];
@@ -33,6 +37,27 @@ self.addEventListener('activate', e => {
     caches.keys().then(keys => Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k))))
   );
   self.clients.claim();
+});
+
+// Review Now / Snooze 1h buttons on a web notification (see
+// pushReminderNotification, js/notifications.js) — this service worker is a
+// separate execution context from the page, so it can't call reviewTab()
+// or similar directly; it just relays which action was pressed to whichever
+// page client is open, which handles it via its own 'message' listener.
+self.addEventListener('notificationclick', e => {
+  e.notification.close();
+  const action = e.action; // '' for a click on the notification body itself
+  e.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(clients => {
+      const client = clients.find(c => 'focus' in c);
+      if (client) {
+        client.focus();
+        client.postMessage({ type: 'notification-action', action });
+      } else {
+        self.clients.openWindow('./index.html');
+      }
+    })
+  );
 });
 
 self.addEventListener('fetch', e => {

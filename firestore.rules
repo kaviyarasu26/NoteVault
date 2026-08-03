@@ -1,0 +1,63 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+
+      // Daily vault snapshots (bkp — js/backup.js), one doc per calendar
+      // date, pruned to a rolling 7 days. Subcollections don't inherit the
+      // parent match's rule in Firestore, so this needs its own block even
+      // though the condition is identical: only the owning account, never
+      // anyone else, matching every other rule in this file's "your own
+      // data only" shape.
+      match /backups/{date} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+    }
+
+    match /folder_shares/{shareId} {
+      allow create: if request.auth != null
+                    && request.auth.uid == request.resource.data.ownerUid
+                    && request.auth.token.email == request.resource.data.ownerEmail;
+      allow read: if request.auth != null
+                  && (request.auth.uid == resource.data.ownerUid
+                      || request.auth.token.email.lower() == resource.data.toEmail);
+      allow update: if request.auth != null
+                    && request.auth.token.email.lower() == resource.data.toEmail
+                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']);
+      allow delete: if request.auth != null
+                    && request.auth.uid == resource.data.ownerUid;
+    }
+
+    match /folder_links/{linkId} {
+      allow create: if request.auth != null
+                    && request.auth.uid == request.resource.data.recipientUid;
+      allow read: if request.auth != null
+                  && (request.auth.uid == resource.data.ownerUid
+                      || request.auth.uid == resource.data.recipientUid);
+      // Added: the recipient's device periodically reports its own review
+      // activity back onto its own link doc (reportSharedFolderReview(),
+      // js/folder-share.js) so the owner can see it's actually being used.
+      // There was no update rule at all before this, so that write was
+      // being silently rejected — reviewCount/lastReviewedAt never showed
+      // up on the owner's side. Scoped tight: only the recipient, only
+      // those two fields, never touching ownerUid/folderId/etc.
+      allow update: if request.auth != null
+                    && request.auth.uid == resource.data.recipientUid
+                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reviewCount', 'lastReviewedAt']);
+      allow delete: if request.auth != null
+                    && (request.auth.uid == resource.data.recipientUid
+                        || request.auth.uid == resource.data.ownerUid);
+    }
+
+    match /shared_folders/{sharedId} {
+      allow write: if request.auth != null
+                   && request.auth.uid == request.resource.data.ownerUid;
+      allow read: if request.auth != null
+                  && (resource == null
+                      || request.auth.uid == resource.data.ownerUid
+                      || exists(/databases/$(database)/documents/folder_links/$(resource.data.ownerUid + '_' + resource.data.folderId + '_' + request.auth.uid)));
+    }
+  }
+}

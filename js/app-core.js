@@ -52,8 +52,12 @@ window.closeAnchoredMenu=closeAnchoredMenu;
 // a lightweight ==highlight== / ![[img:ID]] convention. it.richText marks
 // which format an item is in; legacy items get escaped + auto-converted
 // on first load/edit, then permanently become richText:true from then on.
-const ALLOWED_TAGS=new Set(['B','STRONG','I','EM','U','SPAN','BR','DIV','IMG']);
-const ALLOWED_STYLE_PROPS=new Set(['color','font-weight','background-color','background','text-decoration']);
+const ALLOWED_TAGS=new Set(['B','STRONG','I','EM','U','SPAN','BR','DIV','IMG','UL','LI']);
+// 'width' is here specifically so a resized <img>'s inline width survives
+// sanitizeHtml (which onInput runs on every keystroke) — height is never
+// set inline, it stays on the .nv-img CSS class's height:auto so aspect
+// ratio is always preserved automatically.
+const ALLOWED_STYLE_PROPS=new Set(['color','font-weight','background-color','background','text-decoration','width']);
 const DANGEROUS_TAGS=new Set(['SCRIPT','STYLE','IFRAME','OBJECT','EMBED','LINK','META','FORM','SVG']);
 const IMG_RE=/!\[\[img:([a-zA-Z0-9]+)\]\]/g;
 
@@ -72,6 +76,14 @@ function sanitizeHtml(html){
         const name=attr.name.toLowerCase();
         if(tag==='IMG'&&name==='src'){ if(!/^data:image\//i.test(attr.value)) node.removeAttribute(attr.name); return; }
         if(tag==='IMG'&&(name==='alt'||name==='class')) return;
+        // Exact-match allowlist, not "any class" — a class can't execute
+        // anything, but there's no reason to let arbitrary values through
+        // either (this can carry content from other people via shared
+        // folders/.nvault imports). nv-hl is the one class format spans use
+        // (see applyHighlight) so highlighted text can be colored
+        // differently in the editor vs. the Review answer view (.rv-a is
+        // already yellow by default — an inline color could never do that).
+        if(tag==='SPAN'&&name==='class'&&attr.value==='nv-hl') return;
         if(name==='style'){
           const clean=[...node.style].filter(p=>ALLOWED_STYLE_PROPS.has(p)).map(p=>`${p}:${node.style.getPropertyValue(p)}`).join(';');
           if(clean) node.setAttribute('style',clean); else node.removeAttribute('style');
@@ -99,7 +111,7 @@ function htmlToText(html){
 // Converts an old plain-text item (possibly using the legacy ==highlight==
 // / ![[img:ID]] convention) into safe HTML, one time, on first load.
 function legacyResolve(escapedText){
-  let html=escapedText.replace(/==(.+?)==/g,'<span style="color:var(--yellow);font-weight:700;">$1</span>');
+  let html=escapedText.replace(/==(.+?)==/g,'<span class="nv-hl">$1</span>');
   html=html.replace(IMG_RE,(m,id)=>{
     const src=D.images&&D.images[id];
     return src?`<img class="nv-img" src="${src}" alt="pasted image">`:m;
@@ -129,12 +141,18 @@ function placeCursorAtEnd(el){
 // contexts) instead of throwing, which makes failures invisible. Manual
 // Range manipulation has no such caveat.
 function wrapSelectionWith(tagName,styleFn){
+  // Text is still selectable even with contenteditable="false" (that's a
+  // separate browser feature), so this needs its own read-only/Read Mode
+  // check — it doesn't inherit one just because typing is disabled.
+  const doc=getDoc();
+  if(doc && (isDocReadOnly(doc) || readModeOn)) return;
   const sel=window.getSelection();
   if(!sel.rangeCount||sel.isCollapsed){ toast('⚠️ Select text first'); return; }
   const range=sel.getRangeAt(0);
   const startEl=(range.commonAncestorContainer.nodeType===1?range.commonAncestorContainer:range.commonAncestorContainer.parentElement);
   const editorEl=startEl&&startEl.closest('.item-ta');
-  if(!editorEl) return;
+  if(!editorEl){ toast('⚠️ Selection must be inside the note text'); return; }
+  pushUndoSnapshot(false);
   const wrapper=document.createElement(tagName);
   if(styleFn) styleFn(wrapper);
   wrapper.appendChild(range.extractContents());
@@ -147,12 +165,122 @@ function wrapSelectionWith(tagName,styleFn){
   onInput(editorEl,parseInt(editorEl.dataset.i,10));
 }
 
-// Alt+H — wraps the current selection in a bold, yellow span immediately
-// (no markup syntax to type or remember).
+// ── FORMAT TOGGLE STATE (typing without an active selection) ───────
+// Word/Docs-style: with text selected, a format shortcut wraps the
+// selection immediately (wrapSelectionWith, above). With no selection —
+// just a blinking caret — the same shortcut instead toggles "keep applying
+// this format to what I type next": press once, type formatted text, press
+// again, drop back to normal. Implemented by inserting an empty inline
+// wrapper (holding a zero-width space so the caret has somewhere to sit)
+// and leaving the caret inside it — browsers append newly-typed characters
+// into the text node the caret already sits inside, so nothing else needs
+// to happen on every keystroke. Tracked only as plain JS state, never a
+// DOM data-* attribute — sanitizeHtml (onInput, every keystroke) strips any
+// attribute it doesn't recognize, which would force a destructive
+// innerHTML reset (see onInput) the moment it did, breaking this mid-word.
+let activeTypingFormat=null, activeTypingWrapper=null;
+
+function applyFormat(tagName,styleFn){
+  const doc=getDoc();
+  if(doc && (isDocReadOnly(doc) || readModeOn)) return;
+  const sel=window.getSelection();
+  if(!sel.rangeCount) return;
+  if(sel.isCollapsed) toggleTypingFormat(tagName,styleFn);
+  else wrapSelectionWith(tagName,styleFn);
+}
+
+function toggleTypingFormat(tagName,styleFn){
+  const sel=window.getSelection();
+  const range=sel.getRangeAt(0);
+  const startEl=(range.commonAncestorContainer.nodeType===1?range.commonAncestorContainer:range.commonAncestorContainer.parentElement);
+  const editorEl=startEl&&startEl.closest('.item-ta');
+  if(!editorEl) return;
+
+  // Pressing the same shortcut again from inside the still-live wrapper
+  // turns it off; pressing it (or a different format) somewhere else starts
+  // fresh instead of blindly closing out a wrapper the caret already left.
+  const stillInside=activeTypingWrapper && document.contains(activeTypingWrapper) &&
+    (activeTypingWrapper===startEl || activeTypingWrapper.contains(startEl));
+  if(stillInside && activeTypingFormat===tagName){
+    const after=document.createRange();
+    after.setStartAfter(activeTypingWrapper);
+    after.collapse(true);
+    sel.removeAllRanges();
+    sel.addRange(after);
+    activeTypingFormat=null; activeTypingWrapper=null;
+    return;
+  }
+
+  pushUndoSnapshot(false);
+  const wrapper=document.createElement(tagName);
+  if(styleFn) styleFn(wrapper);
+  wrapper.appendChild(document.createTextNode('​'));
+  range.deleteContents();
+  range.insertNode(wrapper);
+  const inner=document.createRange();
+  inner.setStart(wrapper.firstChild,1);
+  inner.collapse(true);
+  sel.removeAllRanges();
+  sel.addRange(inner);
+  activeTypingFormat=tagName;
+  activeTypingWrapper=wrapper;
+}
+
+// Alt+H — highlight. With a selection, wraps it immediately; with just a
+// caret, toggles "everything I type now is highlighted" (see applyFormat).
+// Uses a class, not an inline color, specifically so the Review Answer view
+// (.rv-a, already yellow+bold by default — see css/base.css) can render a
+// highlight in a different color there than the editor does.
 function applyHighlight(){
-  wrapSelectionWith('span',el=>{ el.style.color='var(--yellow)'; el.style.fontWeight='700'; });
+  applyFormat('span', el=>{ el.className='nv-hl'; });
 }
 window.applyHighlight=applyHighlight;
+
+function applyBold(){ applyFormat('b'); }
+window.applyBold=applyBold;
+function applyItalic(){ applyFormat('i'); }
+window.applyItalic=applyItalic;
+function applyUnderline(){ applyFormat('u'); }
+window.applyUnderline=applyUnderline;
+
+// List — wraps each line of the selection (or, with no selection, the
+// whole item) in <li>/<ul>; toggles back to plain <br>-separated lines if
+// the selection is already inside one. Deliberately doesn't make Enter
+// create a new <li> — Enter already means "new outline item" everywhere
+// else in this editor (see onKey below), so lines go in with Alt+Enter
+// first, same as any other multi-line item, and this just wraps what's
+// already there.
+function applyList(){
+  const doc=getDoc();
+  if(doc && (isDocReadOnly(doc) || readModeOn)) return;
+  const sel=window.getSelection();
+  if(!sel.rangeCount) return;
+  const range=sel.getRangeAt(0);
+  const startEl=(range.commonAncestorContainer.nodeType===1?range.commonAncestorContainer:range.commonAncestorContainer.parentElement);
+  const editorEl=startEl&&startEl.closest('.item-ta');
+  if(!editorEl){ toast('⚠️ Selection must be inside the note text'); return; }
+
+  const existingList=startEl.closest('ul');
+  pushUndoSnapshot(false);
+
+  if(existingList && editorEl.contains(existingList)){
+    const lines=[...existingList.querySelectorAll('li')].map(li=>li.innerHTML);
+    const frag=document.createRange().createContextualFragment(lines.join('<br>')||'<br>');
+    existingList.replaceWith(frag);
+  } else {
+    let html;
+    if(sel.isCollapsed){ html=editorEl.innerHTML; }
+    else { const d=document.createElement('div'); d.appendChild(range.cloneContents()); html=d.innerHTML; }
+    const lines=html.split(/<br\s*\/?>/i).map(l=>l.trim()).filter(l=>l.length);
+    if(!lines.length){ toast('⚠️ Nothing to listify'); return; }
+    const ul=document.createElement('ul');
+    lines.forEach(l=>{ const li=document.createElement('li'); li.innerHTML=l; ul.appendChild(li); });
+    if(sel.isCollapsed){ editorEl.innerHTML=''; editorEl.appendChild(ul); }
+    else { range.deleteContents(); range.insertNode(ul); }
+  }
+  onInput(editorEl,parseInt(editorEl.dataset.i,10));
+}
+window.applyList=applyList;
 
 
 // Inserts a plain text node (used for `>>` and pasted plain text) or a
@@ -234,6 +362,7 @@ window.handleAvatarUpload=handleAvatarUpload;
 async function onPaste(e,i){
   const cd=e.clipboardData;
   if(!cd) return;
+  pushUndoSnapshot(false);
   let imgItem=null;
   if(cd.items){ for(const it of cd.items){ if(it.type&&it.type.startsWith('image/')){ imgItem=it; break; } } }
 
@@ -259,6 +388,10 @@ async function onPaste(e,i){
       range.collapse(true);
       sel.removeAllRanges();
       sel.addRange(range);
+      // Same as Alt+Enter — drop the cursor onto its own line right after
+      // the image, instead of leaving it crammed inline with whatever text
+      // comes next.
+      insertBreakAtCursor();
 
       const el=document.querySelector(`.item-ta[data-i="${i}"]`);
       if(el) onInput(el,i);
@@ -421,7 +554,10 @@ function defaultData(){
     todayXpDate: null,
     dailyGoal: 30,
     totalReviewed: 0,
-    badges: []
+    badges: [],
+    gardenStage: 0,
+    lastGoalCelebrationDate: null,
+    lastBackupDate: null
   };
 }
 
@@ -449,6 +585,9 @@ function migrateDataIfNeeded() {
     if(typeof D.dailyGoal !== 'number') D.dailyGoal = 30;
     if(typeof D.totalReviewed !== 'number') D.totalReviewed = 0;
     if(!Array.isArray(D.badges)) D.badges = [];
+    if(typeof D.gardenStage !== 'number') D.gardenStage = 0;
+    if(D.lastGoalCelebrationDate === undefined) D.lastGoalCelebrationDate = null;
+    if(D.lastBackupDate === undefined) D.lastBackupDate = null;
     if(D.todayXpDate !== today()){ D.todayXp = 0; D.todayXpDate = today(); }
     D.folders.forEach(f=>{ if(typeof f.reviewCount !== 'number') f.reviewCount = 0; });
 }
@@ -478,6 +617,15 @@ window.addEventListener('keydown', e => {
     window.saveLS();
     toast('💾 Triggered sync successfully');
   }
+  // Ctrl/Cmd+Z / Ctrl/Cmd+Y (or +Shift+Z) — undo/redo, editor screen only.
+  // Always preventDefault so the browser's native contenteditable undo (see
+  // the comment above the undo/redo stack in app-core.js) never fires
+  // alongside our own and produces a confusing double-undo.
+  if ((e.ctrlKey || e.metaKey) && document.getElementById('s-editor').classList.contains('active')) {
+    const k = e.key.toLowerCase();
+    if (k === 'z' && !e.shiftKey) { e.preventDefault(); undoEdit(); }
+    else if (k === 'y' || (k === 'z' && e.shiftKey)) { e.preventDefault(); redoEdit(); }
+  }
   // Esc closes whichever popup/overlay is currently open, anywhere in the app.
   // With nothing open, Esc from the file editor backs out to the folder view.
   if (e.key === 'Escape') {
@@ -503,7 +651,25 @@ window.addEventListener('keydown', e => {
   }
 });
 
+// Self-toggled "Read Mode" reuses the exact same read-only rendering path
+// renderEditor() already has for shared/read-only folders (disables
+// contenteditable, shows a banner) — see the sharedReadOnly/readOnly split
+// in renderEditor(). #ftoolbar is a separate persistent element outside
+// #ed-content, though, so it doesn't get swept up by that re-render — it
+// has to be hidden explicitly (hideFT() also clears focIdx, so a stale
+// focus index can't be used by the toolbar's own buttons afterward).
+let readModeOn=false;
+function toggleReadMode(){
+  readModeOn=!readModeOn;
+  if(readModeOn) hideFT();
+  renderEditor();
+}
+window.toggleReadMode=toggleReadMode;
+
 function showTab(tab){
+  // Leaving the editor (any way — click, Escape, back button) should never
+  // leave the floating image-resize handles/toolbar stuck on screen.
+  if(tab!=='editor' && window.deselectImage) deselectImage();
   ['home','editor','review','search','sync'].forEach(s=>document.getElementById('s-'+s).classList.remove('active'));
   ['home','search','review','sync'].forEach(s=>{const b=document.getElementById('bn-'+s);if(b)b.classList.remove('active');});
   document.getElementById('s-'+tab).classList.add('active');
@@ -514,15 +680,17 @@ function switchTab(tab){
   if(tab==='home')renderHome();
   if(tab==='search')setTimeout(()=>document.getElementById('srch-inp').focus(),150);
   if(tab==='sync'){
-    if(window.renderSyncScreenExtras)renderSyncScreenExtras();
+    if(window.renderSyncGrowthSection)renderSyncGrowthSection();
     if(window.renderNotificationSettings)renderNotificationSettings();
+    if(window.renderAppLockStatus)renderAppLockStatus();
+    if(window.renderBackupList)renderBackupList();
   }
   showTab(tab);
 }
 
 function openFolder(fId) { curFolder = fId; folderFileFilter=''; renderHome(); }
 function closeFolder() { curFolder = null; renderHome(); }
-function openEditor(id){curDoc=id;focIdx=-1;renderEditor();showTab('editor');}
+function openEditor(id){curDoc=id;focIdx=-1;undoStack=[];redoStack=[];readModeOn=false;renderEditor();showTab('editor');}
 function goHome(){hideFT();renderHome();showTab('home');}
 function exitReview(){renderHome();showTab('home');}
 function reviewTab(){
@@ -619,6 +787,8 @@ function renderHome(){
   const hdrPerfectBadge=document.getElementById('hdr-perfect-badge'),hdrPerfectNum=document.getElementById('hdr-perfect-num');
   if(hdrPerfectBadge){ hdrPerfectBadge.style.display=(D.perfectStreak>0)?'flex':'none'; if(hdrPerfectNum) hdrPerfectNum.textContent=D.perfectStreak; }
   renderXpRing();
+  if(window.renderGrowthSection) renderGrowthSection();
+  if(window.renderSyncGrowthSection) renderSyncGrowthSection();
   renderFolderPath();
 
   const el=document.getElementById('doc-list');
@@ -813,10 +983,69 @@ function isDocReadOnly(doc){
   const folder=D.folders.find(f=>f.id===doc.folderId);
   return !!(folder && folder.readOnly);
 }
+
+// ── UNDO / REDO ──────────────────────────────────────────────────
+// Every structural edit (new item, indent/outdent, delete) goes through
+// updItems() -> renderEditor(), which replaces the entire #ed-content
+// innerHTML and destroys every .item-ta node — so the browser's native
+// per-element contenteditable undo history gets wiped on essentially every
+// Enter press. A small data-level snapshot stack sidesteps that instead of
+// rewriting the editor to patch the DOM incrementally.
+let undoStack=[], redoStack=[];
+const UNDO_MAX=60, UNDO_COALESCE_MS=1200;
+let lastUndoPushAt=0;
+
+function snapshotDoc(){
+  const doc=getDoc();
+  if(!doc) return null;
+  return { docId:doc.id, items:JSON.parse(JSON.stringify(doc.items)) };
+}
+// coalesce=true groups rapid same-item typing into one undo step (used by
+// onInput); coalesce=false always opens a fresh boundary (used by every
+// structural op — new item, indent/outdent, delete, flashcard toggle,
+// highlight, paste) so those are never silently merged into a typing burst.
+function pushUndoSnapshot(coalesce){
+  const snap=snapshotDoc();
+  if(!snap) return;
+  const now=Date.now();
+  const top=undoStack[undoStack.length-1];
+  if(coalesce && top && top.docId===snap.docId && (now-lastUndoPushAt)<UNDO_COALESCE_MS){
+    lastUndoPushAt=now;
+    return;
+  }
+  undoStack.push(snap);
+  if(undoStack.length>UNDO_MAX) undoStack.shift();
+  redoStack=[];
+  lastUndoPushAt=now;
+}
+function restoreSnapshot(snap){
+  D.documents=D.documents.map(d=>d.id===snap.docId?{...d,items:JSON.parse(JSON.stringify(snap.items)),updatedAt:new Date().toISOString()}:d);
+  saveLS();
+  if(curDoc===snap.docId) renderEditor();
+}
+function undoEdit(){
+  if(!undoStack.length || !curDoc) return;
+  const current=snapshotDoc();
+  const prev=undoStack.pop();
+  if(current) redoStack.push(current);
+  restoreSnapshot(prev);
+}
+window.undoEdit=undoEdit;
+function redoEdit(){
+  if(!redoStack.length || !curDoc) return;
+  const current=snapshotDoc();
+  const next=redoStack.pop();
+  if(current) undoStack.push(current);
+  restoreSnapshot(next);
+}
+window.redoEdit=redoEdit;
 function renderEditor(){
   const doc=getDoc();if(!doc)return;
+  if(window.deselectImage) deselectImage();
   const folder=D.folders.find(f=>f.id===doc.folderId);
-  const readOnly=!!(folder && folder.readOnly);
+  const sharedReadOnly=!!(folder && folder.readOnly);
+  const readOnly=sharedReadOnly||readModeOn;
+  const lockMsg=sharedReadOnly?'🔒 Edit access denied — this file is shared, read-only':'👁 Read Mode is on — tap the eye icon to resume editing';
   const crumb=document.getElementById('ed-folder-crumb');
   if(crumb) crumb.textContent = folder ? folder.name+' \\ ' : '';
   const ti=document.getElementById('ed-title');
@@ -824,23 +1053,26 @@ function renderEditor(){
   ti.disabled=false;
   ti.readOnly=readOnly;
   ti.oninput=readOnly?null:e=>{D.documents=D.documents.map(d=>d.id===curDoc?{...d,title:e.target.value,updatedAt:new Date().toISOString()}:d);saveLS();};
-  ti.onclick=readOnly?()=>toast('🔒 Edit access denied — this file is shared, read-only'):null;
+  ti.onclick=readOnly?()=>toast(lockMsg):null;
+
+  const readBtn=document.getElementById('read-mode-btn');
+  if(readBtn) readBtn.classList.toggle('active',readModeOn);
 
   const banner=document.getElementById('ed-readonly-banner');
   if(banner){
     banner.style.display=readOnly?'flex':'none';
-    if(readOnly) banner.textContent=`🔒 Shared by ${folder.sharedFrom?.ownerEmail||'someone'} — read-only. You can Review or Take Test.`;
+    if(readOnly) banner.textContent=sharedReadOnly?`🔒 Shared by ${folder.sharedFrom?.ownerEmail||'someone'} — read-only. You can Review or Take Test.`:'👁 Read Mode — tap the eye icon in the header to resume editing.';
   }
 
   const el=document.getElementById('ed-content');
-  if(!doc.items.length){el.innerHTML='<div style="padding:32px 16px;text-align:center;font-size:13px;color:var(--t3);font-family:var(--mono)">The document is empty.<br><br>Tap here or use the + button to start typing.</div>';return;}
+  if(!doc.items.length){el.innerHTML='<div style="padding:32px 16px;text-align:center;font-size:13px;color:var(--t3);font-family:var(--mono)">The document is empty.<br><br>Tap here or use the + button to start typing.</div>';renderTodoPanel();return;}
   el.innerHTML=doc.items.map((it,i)=>{
     const fc=isFC(it),due=isDue(it);
     const indent=it.level*22;
     let badge='';
     if(fc){if(due)badge=`<span class="fc-badge fc-due">⚡ due</span>`;else if(it.srs?.repetitions>0)badge=`<span class="fc-badge fc-sched">+${it.srs.interval}d</span>`;else badge=`<span class="fc-badge fc-new">new</span>`;}
     const placeholder=(i===0&&doc.items.length<=1&&!readOnly)?'type a note… Q >> A for flashcard':'';
-    const handlers=readOnly?`onclick="toast('🔒 Edit access denied — this file is shared, read-only')"`:`oninput="onInput(this,${i})" onfocus="onFocus(${i})" onkeydown="onKey(event,${i})" onpaste="onPaste(event,${i})"`;
+    const handlers=readOnly?`onclick="toast(${JSON.stringify(lockMsg)})"`:`oninput="onInput(this,${i})" onfocus="onFocus(${i})" onkeydown="onKey(event,${i})" onpaste="onPaste(event,${i})"`;
     return`<div class="item-row" style="padding-left:${12+indent}px" data-i="${i}">
       <div class="item-bullet"><div class="bdot${it.level>0?' child':''}"></div></div>
       <div class="item-ta${fc?' fc':''}" data-i="${i}" contenteditable="${readOnly?'false':'true'}" data-placeholder="${esc(placeholder)}" ${handlers}
@@ -848,10 +1080,12 @@ function renderEditor(){
       <div class="fc-bd" data-i="${i}">${badge}</div>
     </div>`;
   }).join('');
+  renderTodoPanel();
 }
 
 function onInput(el,i){
   const doc=getDoc();if(!doc)return;
+  pushUndoSnapshot(true);
   const clean=sanitizeHtml(el.innerHTML);
   if(clean!==el.innerHTML){
     const hadFocus=document.activeElement===el;
@@ -869,6 +1103,7 @@ function onInput(el,i){
     bd.innerHTML=fc?(due?`<span class="fc-badge fc-due">⚡ due</span>`:(it.srs?.repetitions>0?`<span class="fc-badge fc-sched">+${it.srs.interval}d</span>`:`<span class="fc-badge fc-new">new</span>`)):'';
   }
   el.classList.toggle('fc',isFC(it));
+  renderTodoPanel();
 }
 function onFocus(i){focIdx=i;showFT();}
 
@@ -900,6 +1135,13 @@ function onKey(e,i){
       return;
     }
   }
+  // Tab / Shift+Tab — indent/outdent the current item, same as the toolbar
+  // buttons (tbIndent/tbOutdent already handle refocus after re-render).
+  if(e.key==='Tab'){
+    e.preventDefault();
+    if(e.shiftKey) tbOutdent(); else tbIndent();
+    return;
+  }
   // Inject ` >> ` at cursor with keyboard shortcut — skip if the item is
   // already a flashcard, so repeated presses don't stack duplicate `>>`.
   if ((e.ctrlKey && e.code === 'Space') || (e.altKey && e.key === '/')) {
@@ -909,12 +1151,15 @@ function onKey(e,i){
     onInput(t, i);
     return;
   }
-  // Alt+H: highlight the current selection immediately — bold + yellow,
-  // visible right away, no markup syntax involved.
-  if(e.altKey && e.code==='KeyH'){
-    e.preventDefault();
-    applyHighlight();
-  }
+  // Ctrl/Cmd+B/I/U — bold/italic/underline, standard convention. Alt+H —
+  // highlight. Alt+L — list. All four: with a selection, wraps it
+  // immediately; with just a caret, toggles "everything I type now is
+  // formatted" (see applyFormat/toggleTypingFormat above).
+  if((e.ctrlKey||e.metaKey) && !e.shiftKey && e.code==='KeyB'){ e.preventDefault(); applyBold(); return; }
+  if((e.ctrlKey||e.metaKey) && !e.shiftKey && e.code==='KeyI'){ e.preventDefault(); applyItalic(); return; }
+  if((e.ctrlKey||e.metaKey) && !e.shiftKey && e.code==='KeyU'){ e.preventDefault(); applyUnderline(); return; }
+  if(e.altKey && e.code==='KeyL'){ e.preventDefault(); applyList(); return; }
+  if(e.altKey && e.code==='KeyH'){ e.preventDefault(); applyHighlight(); return; }
 }
 
 function showFT(){document.getElementById('ftoolbar').classList.add('on');}
@@ -960,6 +1205,18 @@ function tbDel(){
   updItems(items.filter((_,i)=>i!==idx),true,nf);
 }
 function updItems(items,rerender=true,refocus=-1){
+  // The floating toolbar (#ftoolbar) is a separate persistent element, not
+  // rebuilt by renderEditor() — it doesn't get read-only-ified the way
+  // .item-ta's own handlers do just by re-rendering. Its buttons (tbNew/
+  // tbIndent/tbOutdent/tbCard/tbDel) all funnel through here, so this is
+  // the one place needed to block them for a shared read-only folder or a
+  // self-toggled Read Mode.
+  const doc=getDoc();
+  if(doc && (isDocReadOnly(doc) || readModeOn)) return;
+  // Every structural op (new item, indent/outdent, delete, flashcard toggle)
+  // funnels through here, so this is the one place needed to give each of
+  // them its own undo boundary (never coalesced with typing).
+  pushUndoSnapshot(false);
   D.documents=D.documents.map(d=>d.id===curDoc?{...d,items,updatedAt:new Date().toISOString()}:d);saveLS();
   if(rerender){
     renderEditor();
@@ -969,9 +1226,67 @@ function updItems(items,rerender=true,refocus=-1){
   }
 }
 
+// ── TODO DRAWER (current file only) ─────────────────────────────
+// `//TODO: text` (the `//` and `:` are both optional) anywhere in an item's
+// content — items are richText/HTML, so this strips tags to plain text
+// before matching.
+function stripTags(html){
+  const d=document.createElement('div');
+  d.innerHTML=html||'';
+  return d.textContent||'';
+}
+function scanTodos(){
+  const doc=getDoc();
+  if(!doc) return [];
+  const out=[];
+  doc.items.forEach((it,i)=>{
+    const plain=stripTags(it.content).replace(/\s+/g,' ').trim();
+    const m=plain.match(/(?:\/\/\s*)?TODO:?\s*(.*)/i);
+    if(m) out.push({index:i, text:(m[1]||'').trim()||plain});
+  });
+  return out;
+}
+function renderTodoPanel(){
+  const list=document.getElementById('todo-panel-list');
+  const badge=document.getElementById('todo-badge');
+  if(!list) return;
+  const todos=getDoc()?scanTodos():[];
+  if(badge){
+    if(todos.length){ badge.style.display='flex'; badge.textContent=todos.length>9?'9+':String(todos.length); }
+    else badge.style.display='none';
+  }
+  list.innerHTML=todos.length?todos.map(t=>`<div class="notif-item todo-item" onclick="jumpToTodoItem(${t.index})">
+      <div class="notif-item-ico">📌</div>
+      <div class="notif-item-body"><span>${esc(t.text)}</span></div>
+    </div>`).join('')
+    :'<div style="padding:30px 14px;text-align:center;font-size:12px;color:var(--t3);font-family:var(--mono)">No TODOs in this file</div>';
+}
+window.renderTodoPanel=renderTodoPanel;
+
+function openTodoPanel(){
+  renderTodoPanel();
+  document.getElementById('todo-panel-ov').classList.add('open');
+}
+window.openTodoPanel=openTodoPanel;
+function closeTodoPanel(){
+  document.getElementById('todo-panel-ov').classList.remove('open');
+}
+window.closeTodoPanel=closeTodoPanel;
+
+function jumpToTodoItem(i){
+  closeTodoPanel();
+  const tas=document.querySelectorAll('.item-ta');
+  if(tas[i]){
+    tas[i].scrollIntoView({block:'center',behavior:'smooth'});
+    tas[i].focus();
+    placeCursorAtEnd(tas[i]);
+    onFocus(i);
+  }
+}
+window.jumpToTodoItem=jumpToTodoItem;
+
 // ── REVIEW ───────────────────────────────────────────────────────
 function reviewThisDoc(){
-  closeEdMenu();
   const cards=getDoc().items.filter(i=>isDue(i)&&isFC(i)).map(i=>({...i,_d:curDoc}));
   if(!cards.length){toast('⚠️ No due cards in this file');return;}
   rvCards=cards;rvIdx=0;rvShowAns=false;rvTestMode=false;rvStats={1:0,2:0,3:0,4:0,5:0,xp:0};rvBusy=false;hideFT();renderRv();showTab('review');
@@ -1011,6 +1326,8 @@ function rate(q){
   rvBusy=true;
   const card=rvCards[rvIdx];
   let newBadges=[];
+  let newStage=null;
+  let goalJustCompleted=false;
 
   // Test Mode is pure practice — it must never touch the SM-2 schedule,
   // the perfect-streak counter, XP/badges, or the daily-activity tracker.
@@ -1038,7 +1355,11 @@ function rate(q){
     }
 
     if(window.checkAchievements) newBadges=window.checkAchievements();
+    if(window.checkGrowthStage) newStage=window.checkGrowthStage();
+    if(window.checkDailyGoalComplete) goalJustCompleted=window.checkDailyGoalComplete();
     if(window.renderXpRing) renderXpRing();
+    if(window.renderGrowthSection) renderGrowthSection();
+  if(window.renderSyncGrowthSection) renderSyncGrowthSection();
     saveLS();
   }
 
@@ -1093,6 +1414,12 @@ function rate(q){
     // session on the same card forever.
     try{
       if(!rvTestMode && newBadges.length) newBadges.forEach(b=>window.announceBadge&&window.announceBadge(b));
+      // Fire-and-forget (toast + confetti burst + notification, no overlay) —
+      // deliberately NOT routed through showVictoryCelebration's blocking
+      // overlay+callback below, so it can never race/double-call advance()
+      // if a stage-up and a 5th-perfect-in-a-row land on the same card.
+      if(!rvTestMode && newStage && window.announceGrowthStage) window.announceGrowthStage(newStage);
+      if(!rvTestMode && goalJustCompleted && window.announceGoalComplete) window.announceGoalComplete();
       if(!rvTestMode && D.perfectStreak>0 && D.perfectStreak%5===0){ showVictoryCelebration(D.perfectStreak,advance); return; }
     }catch(e){ console.error('Post-rating celebration step failed', e); }
     advance();
@@ -1448,9 +1775,6 @@ function confirmNewDoc(){
   const nd={id:gid(), folderId: curFolder, title:t,createdAt:now,updatedAt:now,items:[{id:gid(),content:'',level:0,srs:null,richText:true}]};
   D.documents.push(nd);saveLS();closeNewDoc();openEditor(nd.id); toast('📄 File created');
 }
-
-function showEdMenu(){document.getElementById('ed-menu-h').textContent=getDoc()?.title||'';document.getElementById('ed-menu-ov').classList.add('open');}
-function closeEdMenu(){document.getElementById('ed-menu-ov').classList.remove('open');}
 
 // File Menu Actions (from Home Screen)
 function openHomeFileMenu(docId, event) {
