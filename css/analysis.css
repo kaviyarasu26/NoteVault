@@ -1,0 +1,15 @@
+/* ── Analysis tab ─────────────────────────────────────────────── */
+.analysis-metric-select{background:var(--s2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:var(--mono);font-size:11px;font-weight:600;padding:5px 8px;outline:none;cursor:pointer;}
+.analysis-metric-select:focus{border-color:var(--acc);}
+.analysis-year-picker{display:flex;align-items:center;gap:8px;margin-bottom:10px;}
+.analysis-year-nav{width:26px;height:26px;border-radius:8px;border:1px solid var(--border);background:var(--s2);color:var(--t2);font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .12s,color .12s;}
+.analysis-year-nav:hover{background:var(--s3);color:var(--text);}
+.analysis-year-nav:disabled{opacity:.35;cursor:not-allowed;}
+.analysis-year-label{font-family:var(--mono);font-size:14px;font-weight:700;color:var(--text);min-width:44px;text-align:center;}
+.analysis-cal-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:2px;}
+.analysis-cal-scroll svg{display:block;}
+.analysis-legend{display:flex;align-items:center;gap:4px;font-size:10px;color:var(--t3);font-family:var(--mono);margin-top:8px;}
+.analysis-legend-sq{width:10px;height:10px;border-radius:2px;display:inline-block;flex-shrink:0;}
+.analysis-empty{padding:22px 6px;text-align:center;font-size:13px;color:var(--t2);font-family:var(--sans);line-height:1.6;}
+.analysis-chart-wrap{margin-top:10px;}
+.analysis-chart-wrap svg{width:100%;height:auto;display:block;}

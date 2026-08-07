@@ -6,7 +6,8 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "build:web": "node scripts/copy-web.js",
-    "build:apk": "node scripts/build-apk.js"
+    "build:apk": "node scripts/build-apk.js",
+    "gen:notif-sounds": "node scripts/gen-notification-sounds.js"
   },
   "repository": {
     "type": "git",

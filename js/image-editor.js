@@ -233,7 +233,7 @@ window.addEventListener('load',()=>{
     if(!img) return;
     const doc=getDoc();
     if(doc && isDocReadOnly(doc)) return; // shared read-only files
-    if(readModeOn) return; // self-toggled Read Mode
+    if(docModeOn) return; // self-toggled, continuous read-only Document Mode
     e.preventDefault();
     selectImageForResize(img);
   });

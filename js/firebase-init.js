@@ -1,6 +1,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
 import { getAuth, signOut, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile, sendEmailVerification, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 import { getFirestore, doc, getDoc, getDocs, setDoc, deleteDoc, collection, addDoc, query, where, onSnapshot, updateDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import { getStorage, ref, uploadString, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-storage.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyAIjry7BPg-novEi-gGiF2nhR9rG11oQGo",
@@ -15,13 +16,34 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
+const storage = getStorage(app);
 
 // Expose Firestore primitives so classic (non-module) feature scripts
 // (master-share.js, etc.) can talk to Firestore without their own imports.
 window.db = db;
 window.fb = { doc, getDoc, getDocs, setDoc, deleteDoc, collection, addDoc, query, where, onSnapshot, updateDoc };
+// Same reason, for the image-upload path (app-core.js uploadImageToStorage)
+// — callers there always wrap this in a try/catch and fall back to the
+// existing inline-base64 image storage on any failure (bucket rules not
+// deployed yet, offline, quota, etc.), so this never has to be load-bearing.
+window.storage = storage;
+window.storageFns = { ref, uploadString, getDownloadURL };
 
 window.currentUser = null;
+
+// #app-loading (index.html) is open by default so the very first paint is
+// covered too — these just toggle it after that. hideAppLoading is called
+// once at the tail of onAuthStateChanged below (the single place that always
+// knows whether D is populated or the sign-in gate is showing instead), so
+// it never comes down before one of those two is actually true.
+window.showAppLoading = () => {
+  const el = document.getElementById('app-loading');
+  if (el) el.classList.add('open');
+};
+window.hideAppLoading = () => {
+  const el = document.getElementById('app-loading');
+  if (el) el.classList.remove('open');
+};
 
 // The profile icon (top-right on Home/Search/Sync) replaces the old
 // standalone Sign In/Sign Out button — its icon/title reflect auth state,
@@ -47,10 +69,14 @@ function updateProfileButtons(state){
 }
 window.updateProfileButtons = updateProfileButtons;
 
+// Profile now lives inline in the Sync tab (see #profile-section,
+// index.html) instead of a popup — this just navigates there. switchTab
+// itself re-renders the section's fields on every visit (app-core.js), so
+// there's nothing else to trigger here.
 window.openProfileOrAuth = () => {
   const user = auth.currentUser;
   if (user && user.emailVerified) {
-    window.openProfileMenu();
+    switchTab('sync');
   } else if (user && !user.emailVerified) {
     const lbl = document.getElementById('pending-email-lbl');
     if (lbl) lbl.textContent = user.email;
@@ -60,21 +86,22 @@ window.openProfileOrAuth = () => {
   }
 };
 
-window.openProfileMenu = () => {
+// Populates the inline Profile section's fields (avatar/name/email) —
+// same data openProfileMenu used to load into the old popup, just no
+// overlay to open now. Called from switchTab('sync') (app-core.js) and
+// right after sign-in below, so it's always fresh whenever it's visible.
+window.renderProfileSection = () => {
   const user = auth.currentUser;
   if (!user) return;
-  document.getElementById('profile-name-inp').value = user.displayName || '';
-  document.getElementById('profile-email-inp').value = user.email || '';
+  const nameInp = document.getElementById('profile-name-inp');
+  const emailInp = document.getElementById('profile-email-inp');
+  if (nameInp) nameInp.value = user.displayName || '';
+  if (emailInp) emailInp.value = user.email || '';
   const avatarPreview = document.getElementById('profile-avatar-preview');
   if (avatarPreview) {
     avatarPreview.innerHTML = (typeof D!=='undefined' && D && D.avatar)
       ? `<img src="${D.avatar}" alt="" class="profile-avatar-thumb">` : personIconSvg(34);
   }
-  document.getElementById('profile-ov').classList.add('open');
-};
-
-window.closeProfileMenu = () => {
-  document.getElementById('profile-ov').classList.remove('open');
 };
 
 window.saveProfileName = async () => {
@@ -90,10 +117,14 @@ window.saveProfileName = async () => {
 };
 
 window.logOutFromProfile = async () => {
-  window.closeProfileMenu();
   try {
     await signOut(auth);
     toast("👋 Signed out successfully");
+    // Full reload (not just resetting D/curFolder in place) so every screen
+    // — home list, editor, review session, any open overlay — comes back up
+    // in its true signed-out default state on the next sign-in, on both the
+    // web PWA and the Capacitor-wrapped Android app.
+    setTimeout(() => window.location.reload(), 400);
   } catch (e) {
     toast("⚠️ Sign out failed. Try again.");
   }
@@ -120,6 +151,7 @@ window.attemptCloseAuthDismiss = () => {
 // never mix one account's notes into another's.
 async function loadUserData(user) {
   const userDocRef = doc(db, "users", user.uid);
+  window.nvIsNewAccount = false;
   try {
     const snap = await getDoc(userDocRef);
     if (snap.exists() && snap.data().vault) {
@@ -140,6 +172,7 @@ async function loadUserData(user) {
     } else {
       // Brand-new account — start fresh and push straight to Firestore.
       D = defaultData();
+      window.nvIsNewAccount = true;
       window.saveLS();
     }
   } catch (e) {
@@ -171,6 +204,11 @@ window.handleSignIn = async () => {
       toast("⚠️ Please verify your email to continue");
       return;
     }
+    // closeAuth() reveals the home screen right now, but onAuthStateChanged
+    // (which actually calls loadUserData) fires asynchronously right after
+    // this — without showing the loading overlay here, that gap flashes the
+    // still-empty home screen underneath before real data arrives.
+    window.showAppLoading();
     closeAuth();
     toast("✅ Signed in successfully!");
   } catch (err) {
@@ -238,12 +276,20 @@ window.checkVerifiedAndContinue = async () => {
   }
   if (auth.currentUser && auth.currentUser.emailVerified) {
     toast("✅ Email verified!");
+    // This path doesn't go through onAuthStateChanged (user.reload() above
+    // refreshes the emailVerified flag without firing a Firebase auth-state
+    // change event, since the UID/session itself hasn't changed) — so unlike
+    // handleSignIn, this has to show AND hide the loading overlay itself
+    // rather than relying on onAuthStateChanged's shared tail-end hide.
+    window.showAppLoading();
     closeAuth();
     window.currentUser = auth.currentUser;
     await loadUserData(auth.currentUser);
     updateProfileButtons('verified');
+    renderProfileSection();
     renderHome();
     window.dispatchEvent(new CustomEvent('nv-auth-changed', { detail: { user: window.currentUser } }));
+    window.hideAppLoading();
   } else {
     toast("⚠️ Not verified yet — check your inbox and click the link first");
   }
@@ -291,6 +337,7 @@ onAuthStateChanged(auth, async (user) => {
   } else if (verified) {
     await loadUserData(user);
     updateProfileButtons('verified'); // after loadUserData so D.avatar is available
+    renderProfileSection();
   } else {
     updateProfileButtons('signin');
     // Leaving a signed-in account — don't leave curFolder pointing at a
@@ -305,6 +352,13 @@ onAuthStateChanged(auth, async (user) => {
   renderHome();
   if (window.renderNotificationBell) renderNotificationBell();
   window.dispatchEvent(new CustomEvent('nv-auth-changed', { detail: { user: window.currentUser } }));
+  // The one place that always knows, by this point, whether D is genuinely
+  // populated (verified branch, loadUserData awaited above) or the sign-in/
+  // pending-verification gate is showing instead (the other two branches) —
+  // either way there's nothing left to wait on, so the loading overlay comes
+  // down here regardless of which branch ran, including the very first
+  // resolution on page load.
+  window.hideAppLoading();
 });
 
 let syncTimeout = null;

@@ -6,22 +6,40 @@
   --acc:#3d6bff;--acc2:#6d8fff;--acc-glow:#3d6bff30;
   --text:#d4daf5;--t2:#7a85b0;--t3:#3a4570;
   --green:#2dd4a0;--red:#f06080;--orange:#f0a040;--yellow:#e0d060;
+  /* Dedicated flashcard-answer color — brighter/more saturated than the
+     general-purpose --yellow (used elsewhere for badges/highlights) so an
+     answer reads clearly wherever it's shown: Review, the editor's
+     unfocused Q/A split, and Document Mode. */
+  --answer:#ffdd57;
   --mono:'IBM Plex Mono',monospace;--sans:'IBM Plex Sans',sans-serif;
   --r:12px;--safe-b:env(safe-area-inset-bottom,0px);--safe-t:env(safe-area-inset-top,0px);
 }
 html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--sans);overflow:hidden;-webkit-tap-highlight-color:transparent;overscroll-behavior:none;}
 #app{display:flex;flex-direction:column;height:100vh;height:100dvh;width:100%;}
+/* Shown by default in the HTML itself (no JS needed for the very first
+   paint) and toggled off by window.hideAppLoading (js/firebase-init.js) once
+   Firebase has actually resolved auth state + data — see index.html's
+   comment on the element. z-index above every .overlay (highest existing is
+   .victory-ov at 220) since nothing underneath should be interactive yet. */
+.app-loading{position:fixed;inset:0;z-index:500;display:none;flex-direction:column;align-items:center;justify-content:center;gap:20px;background:var(--bg);}
+.app-loading.open{display:flex;}
+.app-loading-logo{border-radius:10px;animation:app-loading-logo-pulse 1.8s ease-in-out infinite;}
+@keyframes app-loading-logo-pulse{0%,100%{transform:scale(1);opacity:1;}50%{transform:scale(1.1);opacity:.7;}}
+.app-loading-spinner{width:30px;height:30px;border:3px solid var(--border);border-top-color:var(--acc2);border-radius:50%;animation:app-loading-spin .8s linear infinite;}
+@keyframes app-loading-spin{to{transform:rotate(360deg);}}
 .screen{display:none;flex:1;flex-direction:column;overflow:hidden;}
 .screen.active{display:flex;}
 .hdr{display:flex;align-items:center;padding:var(--safe-t) 14px 0;background:var(--bg);border-bottom:1px solid var(--border);flex-shrink:0;height:calc(52px + var(--safe-t));gap:8px;}
 .hdr-logo{font-family:var(--mono);font-size:15px;font-weight:600;color:var(--text);display:flex;align-items:center;gap:8px;}
-.logo-dot{width:8px;height:8px;border-radius:50%;background:var(--acc);box-shadow:0 0 8px var(--acc);animation:pulse 2.5s infinite;}
+.hdr-logo-mark{flex-shrink:0;border-radius:5px;}
 .hdr-title{font-family:var(--mono);font-size:14px;font-weight:500;color:var(--text);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 input.hdr-title{background:transparent;border:none;outline:none;padding:0;}
 input.hdr-title::placeholder{color:var(--t3);}
 .ed-title-wrap{flex:1;display:flex;align-items:center;overflow:hidden;min-width:0;}
 .ed-folder-crumb{font-family:var(--mono);font-size:13px;color:var(--t3);white-space:nowrap;flex-shrink:0;}
+.ed-stats-bar{padding:4px 14px;font-family:var(--mono);font-size:10px;color:var(--t3);background:var(--bg);border-bottom:1px solid var(--border);flex-shrink:0;}
 #ed-readonly-banner{display:flex;align-items:center;gap:6px;padding:8px 14px;background:#1a1a0d;border-bottom:1px solid #3a3a1a;color:var(--yellow);font-size:11px;font-family:var(--mono);flex-shrink:0;}
+.banner-edit-btn{margin-left:auto;flex-shrink:0;background:var(--yellow);color:#1a1a0d;border:none;border-radius:6px;padding:4px 10px;font-family:var(--mono);font-size:11px;font-weight:700;cursor:pointer;}
 .icon-btn{width:38px;height:38px;display:flex;align-items:center;justify-content:center;border-radius:9px;border:none;background:transparent;color:var(--t2);cursor:pointer;font-size:18px;flex-shrink:0;transition:background .12s,color .12s;}
 .icon-btn:active,.icon-btn:hover{background:var(--s3);color:var(--text);}
 .icon-btn.active{background:var(--acc-glow);color:var(--acc2);}
@@ -47,8 +65,6 @@ input.hdr-title::placeholder{color:var(--t3);}
 .todo-item{cursor:pointer;}
 .todo-item:active{opacity:.7;}
 
-/* Profile opens anchored to the top-right corner, not centered */
-#profile-ov{justify-content:flex-end;align-items:flex-start;padding:calc(58px + var(--safe-t)) 14px 0 0;}
 .notif-item{display:flex;gap:10px;padding:11px 0;border-top:1px solid var(--border);}
 .notif-item:first-child{border-top:none;}
 .notif-item-ico{font-size:18px;flex-shrink:0;width:28px;text-align:center;}
@@ -93,18 +109,165 @@ input.hdr-title::placeholder{color:var(--t3);}
 .dc-due{color:var(--acc2);font-weight:600;}
 .item-row{display:flex;align-items:flex-start;position:relative;}
 .item-bullet{width:24px;height:40px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+/* Only the actually-draggable bullet (edit mode, not Read/Document Mode
+   or a shared read-only folder — see renderEditor's dragAttrs) gets the
+   grab cursor; otherwise it looked draggable in read-only views where
+   dragging silently does nothing. */
+.item-bullet[draggable="true"]{cursor:grab;}
+.item-bullet[draggable="true"]:active{cursor:grabbing;}
 .bdot{background:var(--acc);flex-shrink:0;border-radius:2px;width:7px;height:7px;}
 .bdot.child{border-radius:50%;background:var(--border2);width:5px;height:5px;}
+.item-check{width:16px;height:16px;accent-color:var(--acc);cursor:pointer;}
+.item-row.item-checked .item-ta{color:var(--t3);text-decoration:line-through;}
+/* Hover-only "convert to flashcard" affordance — desktop-oriented (no
+   hover on touch), the ⚡+Card toolbar button and >>-typing/shortcut
+   remain the primary ways to do this on mobile. */
+.item-fc-hover{opacity:0;flex-shrink:0;align-self:center;width:22px;height:22px;border:none;border-radius:6px;background:transparent;color:var(--t3);font-size:13px;cursor:pointer;transition:opacity .12s,background .12s,color .12s;}
+.item-row:hover .item-fc-hover{opacity:1;}
+.item-fc-hover:hover{background:var(--s3);color:var(--acc2);}
+/* Per-card "hide question outside Review" toggle — left of the bullet,
+   flashcards only, default off. Always visible (not hover-only like
+   .item-fc-hover above) since it reflects a persistent per-card setting,
+   not a one-off action. */
+.item-hideq-toggle{flex-shrink:0;align-self:center;width:22px;height:22px;margin-top:2px;border:none;border-radius:6px;background:transparent;color:var(--t3);font-size:12px;opacity:.55;cursor:pointer;transition:opacity .12s,background .12s,color .12s;}
+.item-hideq-toggle:hover{opacity:1;background:var(--s3);}
+.item-hideq-toggle.on{opacity:1;color:var(--orange);}
+.nv-q-hidden{color:var(--t3);font-style:italic;}
 .item-ta{flex:1;background:transparent;border:none;outline:none;color:var(--text);font-size:14px;font-family:var(--sans);line-height:1.65;padding:10px 4px 10px 0;min-height:40px;word-break:break-word;}
 .item-ta.fc{color:#9ab0ff;}
+/* Question/answer split shown once a flashcard item loses focus (see
+   onItemBlur/fcColorSplitHtml, app-core.js) — while actively editing it
+   reverts to the single flat .fc color above so `>>` typing isn't fighting
+   extra span wrappers. */
+.item-ta.fc .nv-q-live{color:var(--acc2);}
+.item-ta.fc .nv-a-live{color:var(--answer);}
+.item-ta h1,.item-ta h2,.item-ta h3,.doc-mode-para h1,.doc-mode-para h2,.doc-mode-para h3,.rv-q h1,.rv-q h2,.rv-q h3{margin:0;font-family:var(--sans);font-weight:700;line-height:1.3;}
+.item-ta h1,.doc-mode-para h1,.rv-q h1{font-size:24px;}
+.item-ta h2,.doc-mode-para h2,.rv-q h2{font-size:19px;}
+.item-ta h3,.doc-mode-para h3,.rv-q h3{font-size:16px;}
+.item-ta a,.doc-mode-content a,.rv-q a,.rv-a a{color:var(--acc2);text-decoration:underline;text-underline-offset:2px;}
 .item-ta[contenteditable]:empty:before{content:attr(data-placeholder);color:var(--t3);pointer-events:none;}
+
+/* ── Tip block (comic speech-bubble) — /tips slash-command ───────
+   The 💡 icon and tail are both pseudo-elements, not markup — anything
+   placed inside this contenteditable div would get baked into the stored
+   item content the next time it's edited (see app-core.js renderEditor's
+   comment on this same point). */
+.tip-board{
+  background:#2a1f0d;
+  border:1px solid #4a3a1a;
+  border-radius:14px;
+  padding-left:32px;
+  position:relative;
+}
+.tip-board::before{
+  content:'💡';
+  position:absolute;
+  left:9px;top:10px;
+  font-size:13px;line-height:1;
+  pointer-events:none;
+}
+.tip-board::after{
+  content:'';
+  position:absolute;
+  left:22px;bottom:-7px;
+  width:13px;height:13px;
+  background:#2a1f0d;
+  border-right:1px solid #4a3a1a;
+  border-bottom:1px solid #4a3a1a;
+  border-radius:0 0 3px 0;
+  transform:rotate(45deg);
+}
+.tip-board.doc-mode-tip{
+  padding:12px 14px 12px 32px;
+  margin:0 0 16px;
+}
+
+/* ── XML block — /xml slash-command ───────────────────────────── */
+.xml-block-wrap{flex:1;min-width:0;margin:6px 4px 10px 0;}
+.xml-block-toolbar{display:flex;align-items:center;justify-content:space-between;padding:5px 9px;background:var(--s2);border:1px solid var(--border);border-bottom:none;border-radius:10px 10px 0 0;}
+.xml-block-label{font-family:var(--mono);font-size:10px;font-weight:600;color:var(--t2);text-transform:uppercase;letter-spacing:.08em;}
+.xml-block-fmt-btn{padding:3px 10px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--t2);font-size:10px;font-family:var(--mono);cursor:pointer;transition:background .12s,color .12s;}
+.xml-block-fmt-btn:hover{background:var(--s3);color:var(--text);}
+.xml-block-fmt-btn:disabled{opacity:.4;cursor:not-allowed;}
+.xml-block-mount{
+  min-height:40px;
+  border-radius:0 0 10px 10px;
+  overflow:hidden;
+  border:1px solid var(--border);
+  background:var(--bg);
+}
+.xml-block-mount .cm-editor{height:100%;}
+.xml-block-mount .cm-scroller{max-height:320px;overflow-y:auto;}
+/* Code-side flashcard (js/app-core.js's convertCodeBlockToFlashcard) — the
+   plain (non-code) Q or A side, a small labeled text field alongside the
+   code mount. */
+.xml-block-fc-side{display:flex;gap:8px;align-items:flex-start;padding:8px 2px;border-top:1px solid var(--border);margin-top:6px;}
+.xml-block-fc-label{flex-shrink:0;width:16px;height:16px;border-radius:5px;background:var(--s3);color:var(--acc2);font-family:var(--mono);font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;margin-top:1px;}
+.xml-block-fc-text{flex:1;min-height:22px;font-size:13px;color:var(--text);line-height:1.5;outline:none;}
+.xml-block-fc-text[contenteditable]:empty:before{content:'Type the other side…';color:var(--t3);}
+/* The other side of a code-side flashcard, when IT is also code
+   (it.fcOtherBlockType set — only possible on data from before the /xml
+   /lin /sql typing-triggers were removed, kept live to render it) — a
+   second, smaller code mount instead of the plain .xml-block-fc-text field,
+   with its own mini toolbar mirroring the main one. */
+.xml-block-fc-side-code{border-top:1px solid var(--border);margin-top:6px;padding-top:6px;}
+.xml-block-fc-side-code .xml-block-toolbar-sub{border-radius:8px 8px 0 0;padding:4px 8px;}
+.xml-block-fc-side-code .xml-block-mount{border-radius:0 0 8px 8px;min-height:32px;}
+.xml-block-locked-q{padding:20px 12px;text-align:center;font-size:12px;color:var(--t3);font-family:var(--mono);background:var(--s2);border:1px solid var(--border);border-radius:0 0 10px 10px;}
+.doc-mode-xml{
+  background:var(--s2);
+  border:1px solid var(--border);
+  border-radius:10px;
+  padding:12px 14px;
+  font-family:var(--mono);
+  font-size:12px;
+  line-height:1.6;
+  color:var(--text);
+  overflow-x:auto;
+  white-space:pre;
+  margin:0 0 16px;
+}
+/* Matches xml-block.js's CodeMirror HighlightStyle colors, applied via a
+   plain regex pass instead (see highlightEscapedXml, app-core.js) since
+   Document Mode never loads CodeMirror at all. */
+.doc-mode-xml .xh-tag{color:var(--acc2);font-weight:600;}
+.doc-mode-xml .xh-attr{color:var(--green);}
+.doc-mode-xml .xh-comment{color:var(--t3);font-style:italic;}
+
+/* Document Mode — continuous, read-only, no outline/flashcard chrome */
+.doc-mode-content{padding:15px 15px 15px 34px;}
+.doc-mode-para{font-family:var(--sans);font-size:15px;line-height:1.8;color:var(--text);margin:0 0 16px;word-break:break-word;user-select:text;}
+/* Flashcard answers previously rendered as plain text in Document Mode,
+   indistinguishable from a regular note — now colored consistently with
+   Review (.rv-a) and the editor's unfocused Q/A split (.nv-a-live). */
+.doc-mode-answer{color:var(--answer);font-weight:600;}
+.doc-mode-para img.nv-img{max-width:100%;border-radius:8px;margin:6px 0;display:block;}
 .tb-fmt{min-width:38px;font-family:var(--sans);font-size:14px;}
 .fc-badge{font-size:10px;padding:2px 7px;border-radius:5px;margin:13px 8px 0 0;white-space:nowrap;flex-shrink:0;font-family:var(--mono);}
 .fc-due{background:#0d1a3a;color:var(--acc2);border:1px solid #2a3a7e;}
 .fc-sched{background:#0d1a1a;color:var(--green);border:1px solid #1a3a2a;}
 .fc-new{background:#1a1a0d;color:var(--yellow);border:1px solid #3a3a1a;}
-#ftoolbar{display:none;position:fixed;bottom:0;left:0;right:0;background:var(--s2);border-top:1px solid var(--border);padding:7px 10px calc(7px + var(--safe-b));z-index:100;flex-wrap:nowrap;overflow-x:auto;gap:6px;-webkit-overflow-scrolling:touch;}
-#ftoolbar.on{display:flex;}
+#ftoolbar,#ftoolbar-colors{display:none;flex-shrink:0;background:var(--s2);border-bottom:1px solid var(--border);padding:7px 10px;flex-wrap:nowrap;overflow-x:auto;gap:6px;-webkit-overflow-scrolling:touch;align-items:center;}
+#ftoolbar.on,#ftoolbar-colors.on{display:flex;}
+/* Text/background color swatches — a second toolbar row swapped in for
+   #ftoolbar (see openColorSwatches/closeColorSwatches, app-core.js) rather
+   than a popover, so it never needs its own viewport-clamped positioning
+   logic on a small screen. */
+.swatch{width:28px;height:28px;border-radius:50%;border:2px solid var(--border);flex-shrink:0;cursor:pointer;padding:0;}
+.swatch:active{transform:scale(.92);}
+.swatch-custom{background:conic-gradient(red,orange,yellow,green,blue,violet,red);display:flex;align-items:center;justify-content:center;color:#fff;font-size:15px;font-weight:700;text-shadow:0 1px 2px #0008;}
+#custom-color-inp{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;}
+/* Table — bare <table>/<td> render borderless by default, so this is a tag
+   selector (not a class) deliberately: sanitizeHtml's attribute allowlist
+   (app-core.js) only lets a class through on <span> today, and giving
+   <table> its own exemption just to hang a class off it isn't worth it
+   when a tag selector does the same job. */
+.item-ta table,.doc-mode-content table,.rv-q table,.rv-a table{border-collapse:collapse;margin:8px 0;width:100%;font-size:13px;}
+.item-ta td,.item-ta th,.doc-mode-content td,.doc-mode-content th,.rv-q td,.rv-q th,.rv-a td,.rv-a th{border:1px solid var(--border);padding:6px 8px;min-width:40px;vertical-align:top;text-align:left;}
+.item-ta th,.doc-mode-content th,.rv-q th,.rv-a th{background:var(--s2);font-weight:600;}
+.table-dim-row{display:flex;gap:8px;}
+.table-dim-row .sheet-inp{flex:1;}
 .tb{padding:7px 13px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--t2);font-size:12px;cursor:pointer;font-family:var(--mono);flex-shrink:0;transition:all .1s;white-space:nowrap;}
 .tb:active,.tb:hover{background:var(--s3);color:var(--text);}
 .tb.hi{background:#0d1a3a;color:var(--acc2);border-color:#2a3a7e;}
@@ -116,7 +279,18 @@ input.hdr-title::placeholder{color:var(--t3);}
 .rv-q{font-size:19px;font-weight:600;color:var(--text);line-height:1.55;white-space:pre-wrap;max-height:32vh;overflow-y:auto;}
 .rv-sep{height:1px;background:var(--border);margin:20px 0;}
 .rv-a-lbl{font-size:9px;font-family:var(--mono);color:var(--green);text-transform:uppercase;letter-spacing:.15em;margin-bottom:10px;}
-.rv-a{font-size:15px;color:var(--yellow);font-weight:700;line-height:1.7;text-align:left;white-space:pre-wrap;max-height:32vh;overflow-y:auto;}
+.rv-a{font-size:15px;color:var(--answer);font-weight:700;line-height:1.7;text-align:left;white-space:pre-wrap;max-height:32vh;overflow-y:auto;}
+/* A code-side flashcard's code half (rv-q and/or rv-a, either or both —
+   renderRvCodeBox, app-core.js) — the editor's own .xml-block-toolbar/
+   .doc-mode-xml (syntax-highlighted, same highlightEscapedXml Document Mode
+   uses) visual language, reused rather than a bespoke Review-only look.
+   Deliberately no max-height/overflow-y here — .rv-q/.rv-a's own 32vh clamp
+   (above) already scrolls the whole box as one unit; adding a second one
+   here would just nest two scrollbars. */
+.rv-code-box{margin:8px 0;text-align:left;border-radius:10px;overflow:hidden;}
+.rv-code-box .xml-block-toolbar{border-radius:10px 10px 0 0;}
+.doc-mode-xml.rv-code-pre{margin:0;border-radius:0 0 10px 10px;}
+.rv-code-empty{color:var(--t3);font-style:italic;}
 
 /* ── Rich text formatting — see applyHighlight/applyList, app-core.js ── */
 .nv-hl{color:var(--yellow);font-weight:700;}
@@ -219,7 +393,11 @@ input.hdr-title::placeholder{color:var(--t3);}
 .merge-card strong{font-size:13px;color:var(--text);display:block;margin-bottom:3px;}
 .merge-card span{font-size:11px;color:var(--t3);line-height:1.5;display:block;}
 .wf-guide{margin:10px 12px 0;border:1px solid var(--border);border-radius:var(--r);overflow:hidden; max-width: 600px; margin-left: auto; margin-right: auto;}
-.wf-hdr{padding:10px 14px;background:var(--s2);font-family:var(--mono);font-size:10px;font-weight:600;color:var(--t2);text-transform:uppercase;letter-spacing:.1em;border-bottom:1px solid var(--border);}
+.wf-hdr{padding:10px 14px;background:var(--s2);font-family:var(--mono);font-size:10px;font-weight:600;color:var(--t2);text-transform:uppercase;letter-spacing:.1em;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
+.wf-guide.collapsed .wf-hdr{border-bottom:none;}
+.wf-guide.collapsed .wf-body{display:none;}
+.wf-toggle{width:22px;height:22px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--t2);font-size:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:background .12s,color .12s;}
+.wf-toggle:hover{background:var(--s3);color:var(--text);}
 .wf-body{padding:8px 14px;}
 .wf-step{display:flex;gap:10px;padding:8px 0;font-size:12px;color:var(--t2);line-height:1.5;}
 .wf-step+.wf-step{border-top:1px solid var(--border);}
@@ -236,7 +414,6 @@ code{background:var(--s3);padding:1px 5px;border-radius:4px;font-family:var(--mo
 #toast{position:fixed;bottom:calc(66px + var(--safe-b));left:50%;transform:translateX(-50%) translateY(6px);background:var(--s2);border:1px solid var(--border2);color:var(--text);padding:9px 18px;border-radius:20px;font-size:12px;font-family:var(--mono);z-index:200;opacity:0;transition:opacity .2s,transform .2s;pointer-events:none;white-space:nowrap;max-width:92vw;text-align:center;}
 #toast.on{opacity:1;transform:translateX(-50%) translateY(0);}
 @keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
-@keyframes pulse{0%,100%{opacity:1;box-shadow:0 0 8px var(--acc)}50%{opacity:.5;box-shadow:0 0 3px var(--acc)}}
 .fade-in{animation:fadeIn .18s ease;}
 .btn-auth{padding:6px 12px;border-radius:8px;border:1px solid var(--border);background:var(--s2);color:var(--text);font-size:11px;cursor:pointer;font-family:var(--mono);transition:all .1s;}
 .btn-auth:hover{background:var(--s3);}
@@ -326,8 +503,8 @@ code{background:var(--s3);padding:1px 5px;border-radius:4px;font-family:var(--mo
 
 /* ── Daily XP ring (header) ─────────────────────────────────────── */
 .hdr-xp-ring{position:relative;width:24px;height:24px;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;}
-#xp-ring-fg{transition:stroke-dashoffset .4s ease,stroke .2s ease;}
-.hdr-xp-ring.xp-ring-complete #xp-ring-fg{stroke:var(--green);}
+.xp-ring-fg{transition:stroke-dashoffset .4s ease,stroke .2s ease;}
+.hdr-xp-ring.xp-ring-complete .xp-ring-fg{stroke:var(--green);}
 .xp-ring-label{position:absolute;font-size:7px;font-family:var(--mono);font-weight:700;color:var(--acc2);}
 .hdr-xp-ring.xp-ring-complete .xp-ring-label{color:var(--green);}
 
@@ -347,4 +524,17 @@ code{background:var(--s3);padding:1px 5px;border-radius:4px;font-family:var(--mo
 /* ── Streak badge tap (Home header) ─────────────────────────────── */
 @keyframes streakPop{0%{transform:scale(1) rotate(0)}30%{transform:scale(1.35) rotate(-10deg)}55%{transform:scale(.95) rotate(6deg)}75%{transform:scale(1.15) rotate(-3deg)}100%{transform:scale(1) rotate(0)}}
 .streak-pop{animation:streakPop .5s cubic-bezier(.34,1.56,.64,1);}
+
+/* Idle flicker on the 🔥 itself (not the number, so the count stays steady
+   and readable) — same badge instance shows on all four screen headers. */
+.streak-flame{display:inline-block;transform-origin:50% 85%;animation:flameFlicker 1.8s ease-in-out infinite;}
+@keyframes flameFlicker{
+  0%,100%{transform:scale(1) rotate(0deg);filter:drop-shadow(0 0 2px var(--orange));}
+  20%{transform:scale(1.08) rotate(-3deg);filter:drop-shadow(0 0 4px var(--orange));}
+  45%{transform:scale(.94) rotate(2deg);filter:drop-shadow(0 0 1px var(--orange));}
+  70%{transform:scale(1.06) rotate(-2deg);filter:drop-shadow(0 0 5px var(--orange));}
+}
+@media (prefers-reduced-motion: reduce){
+  .streak-flame{animation:none;}
+}
 

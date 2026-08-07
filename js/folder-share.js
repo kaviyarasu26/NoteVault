@@ -90,14 +90,19 @@ function promptIncomingFolderShare(req){
   incomingFolderShare = req;
   document.getElementById('fs-incoming-msg').textContent = `${req.ownerEmail} wants to share the folder "${req.folderName}" with you.`;
   document.getElementById('fs-incoming-ov').classList.add('open');
-  if(window.notifyUser) notifyUser('📥 Folder Share Invite', `${req.ownerEmail} wants to share "${req.folderName}" with you`);
-  // action metadata lets the notification-panel entry (renderNotifPanel,
-  // notifications.js) render its own Accept/Reject buttons — resolved
-  // through resolveNotifShareInvite() there, which calls back into
-  // acceptFolderShare(req)/rejectFolderShare(req) below with a
-  // reconstructed req, same shape as this popup uses.
+  if(window.playShareChime) playShareChime();
+  // pushNotification() already calls notifyUser() internally — a second,
+  // direct notifyUser() call here used to fire alongside it, producing two
+  // native notifications per invite. action metadata lets the
+  // notification-panel entry (renderNotifPanel, notifications.js) render its
+  // own Accept/Reject buttons — resolved through resolveNotifShareInvite()
+  // there, which calls back into acceptFolderShare(req)/rejectFolderShare(req)
+  // below with a reconstructed req, same shape as this popup uses. opts
+  // routes this to the distinct 'nv_share' notification channel/sound with a
+  // single "Open" action, instead of the default channel.
   if(window.pushNotification) window.pushNotification('📥','Folder Share Invite',`${req.ownerEmail} wants to share "${req.folderName}" with you.`,
-    { type:'folder_share_invite', shareId:req.id, ownerUid:req.ownerUid, ownerEmail:req.ownerEmail, folderId:req.folderId, folderName:req.folderName, resolved:null });
+    { type:'folder_share_invite', shareId:req.id, ownerUid:req.ownerUid, ownerEmail:req.ownerEmail, folderId:req.folderId, folderName:req.folderName, resolved:null },
+    { channelId:'nv_share', actionTypeId:'OPEN_ACTION' });
 }
 
 function closeIncomingFolderShare(){

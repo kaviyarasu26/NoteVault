@@ -1,7 +1,35 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" fill="#0d1120"/>
-  <path d="M196 224 v-44 a60 60 0 0 1 120 0 v44" fill="none" stroke="#6d8fff" stroke-width="34" stroke-linecap="round"/>
-  <rect x="136" y="224" width="240" height="176" rx="26" fill="#3d6bff"/>
-  <circle cx="256" cy="296" r="22" fill="#0d1120"/>
-  <rect x="244" y="296" width="24" height="52" rx="8" fill="#0d1120"/>
+  <defs>
+    <radialGradient id="bgG" cx="50%" cy="32%" r="75%">
+      <stop offset="0" stop-color="#141a30"/>
+      <stop offset="1" stop-color="#080b12"/>
+    </radialGradient>
+    <linearGradient id="pageG" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#232b4a"/>
+      <stop offset="1" stop-color="#171d34"/>
+    </linearGradient>
+    <linearGradient id="sealG" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#7d9bff"/>
+      <stop offset="1" stop-color="#3554d1"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="512" height="512" rx="108" fill="url(#bgG)"/>
+
+  <!-- note page, folded top-right corner -->
+  <path d="M132,88 L330,88 L384,142 L384,428 L132,428 Z" fill="url(#pageG)" stroke="#2a3560" stroke-width="4"/>
+  <path d="M330,88 L384,142 L330,142 Z" fill="#0d1120" stroke="#2a3560" stroke-width="3" stroke-linejoin="round"/>
+
+  <!-- note lines -->
+  <rect x="164" y="182" width="152" height="15" rx="7.5" fill="#3a4570"/>
+  <rect x="164" y="216" width="152" height="15" rx="7.5" fill="#3a4570"/>
+  <rect x="164" y="250" width="104" height="15" rx="7.5" fill="#3a4570"/>
+
+  <!-- vault seal, stamped over the page -->
+  <circle cx="256" cy="332" r="100" fill="url(#sealG)" stroke="#22306e" stroke-width="7"/>
+  <circle cx="256" cy="332" r="84" fill="none" stroke="#a9bcff" stroke-width="3" opacity="0.35"/>
+
+  <!-- keyhole -->
+  <circle cx="256" cy="316" r="18" fill="#12172b"/>
+  <path d="M244,326 L268,326 L262,364 L250,364 Z" fill="#12172b"/>
 </svg>

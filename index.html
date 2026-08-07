@@ -18,24 +18,51 @@
 <link rel="stylesheet" href="css/daily-tracker.css">
 <link rel="stylesheet" href="css/notifications.css">
 <link rel="stylesheet" href="css/growth.css">
+<link rel="stylesheet" href="css/analysis.css">
 </head>
 <body>
+<!-- Open by default (no JS needed to show it) — covers the gap between the
+     page appearing and Firebase actually resolving whether there's a signed-in
+     user and, if so, finishing the Firestore read (js/firebase-init.js's
+     onAuthStateChanged/loadUserData). Without this the home screen underneath
+     can flash empty/stale before real data (or the sign-in gate) is ready. -->
+<div id="app-loading" class="app-loading open">
+  <svg width="40" height="40" viewBox="0 0 512 512" class="app-loading-logo">
+    <rect width="512" height="512" rx="108" fill="#0d1120"/>
+    <path d="M132,88 L330,88 L384,142 L384,428 L132,428 Z" fill="#1a2035" stroke="#2a3560" stroke-width="6"/>
+    <path d="M330,88 L384,142 L330,142 Z" fill="#0d1120" stroke="#2a3560" stroke-width="4" stroke-linejoin="round"/>
+    <circle cx="256" cy="332" r="100" fill="var(--acc2)" stroke="#22306e" stroke-width="10"/>
+    <circle cx="256" cy="316" r="18" fill="#0d1120"/>
+    <path d="M244,326 L268,326 L262,364 L250,364 Z" fill="#0d1120"/>
+  </svg>
+  <div class="app-loading-spinner"></div>
+</div>
 <div id="app">
 
 <div id="s-home" class="screen">
   <div class="hdr">
-    <div class="hdr-logo"><div class="logo-dot"></div>NoteVault</div>
+    <div class="hdr-logo">
+      <svg width="22" height="22" viewBox="0 0 512 512" class="hdr-logo-mark">
+        <rect width="512" height="512" rx="108" fill="#0d1120"/>
+        <path d="M132,88 L330,88 L384,142 L384,428 L132,428 Z" fill="#1a2035" stroke="#2a3560" stroke-width="6"/>
+        <path d="M330,88 L384,142 L330,142 Z" fill="#0d1120" stroke="#2a3560" stroke-width="4" stroke-linejoin="round"/>
+        <circle cx="256" cy="332" r="100" fill="var(--acc2)" stroke="#22306e" stroke-width="10"/>
+        <circle cx="256" cy="316" r="18" fill="#0d1120"/>
+        <path d="M244,326 L268,326 L262,364 L250,364 Z" fill="#0d1120"/>
+      </svg>
+      NoteVault
+    </div>
     <div style="flex:1"></div>
     <div class="hdr-actions">
-      <span class="hdr-xp-ring" id="hdr-xp-ring" title="Daily XP goal">
+      <span class="hdr-xp-ring" title="Daily XP goal">
         <svg width="24" height="24" viewBox="0 0 24 24">
           <circle cx="12" cy="12" r="9" fill="none" stroke="var(--border)" stroke-width="3"/>
-          <circle id="xp-ring-fg" cx="12" cy="12" r="9" fill="none" stroke="var(--acc2)" stroke-width="3" stroke-linecap="round" stroke-dasharray="56.5" stroke-dashoffset="56.5" transform="rotate(-90 12 12)"/>
+          <circle class="xp-ring-fg" cx="12" cy="12" r="9" fill="none" stroke="var(--acc2)" stroke-width="3" stroke-linecap="round" stroke-dasharray="56.5" stroke-dashoffset="56.5" transform="rotate(-90 12 12)"/>
         </svg>
-        <span class="xp-ring-label" id="xp-ring-label">0</span>
+        <span class="xp-ring-label">0</span>
       </span>
-      <span class="hdr-badge" id="hdr-streak-badge" title="Daily streak — tap for a boost" style="display:none;cursor:pointer" onclick="celebrateStreak()">🔥<span id="hdr-streak-num">0</span></span>
-      <span class="hdr-badge" id="hdr-perfect-badge" title="Perfect streak" style="display:none">⚡<span id="hdr-perfect-num">0</span></span>
+      <span class="hdr-badge hdr-streak-badge" title="Daily streak — tap for a boost" style="display:none;cursor:pointer" onclick="celebrateStreak()"><span class="streak-flame">🔥</span><span class="hdr-streak-num">0</span></span>
+      <span class="hdr-badge hdr-perfect-badge" title="Perfect streak" style="display:none">⚡<span class="hdr-perfect-num">0</span></span>
       <div class="hdr-search" id="hdr-search-wrap">
         <input id="hdr-search-inp" class="hdr-search-inp" placeholder="Filter folders…" oninput="filterHomeFolders(this.value)"/>
         <button class="icon-btn" onclick="toggleHeaderSearch()" title="Search">
@@ -93,10 +120,10 @@
       <span id="ed-folder-crumb" class="ed-folder-crumb"></span>
       <input id="ed-title" class="hdr-title" placeholder="Untitled" />
     </div>
-    <button class="icon-btn" id="read-mode-btn" onclick="toggleReadMode()" title="Toggle Read Mode">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="19" height="19"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>
+    <button class="icon-btn" id="doc-mode-btn" onclick="toggleDocumentMode()" title="Toggle Document Mode (continuous, read-only)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="19" height="19"><path d="M6 2h9l5 5v15H6z"/><path d="M15 2v5h5"/><path d="M9 13h6M9 17h6"/></svg>
     </button>
-    <button class="icon-btn notif-bell-btn" onclick="openTodoPanel()" title="TODOs in this file">
+    <button class="icon-btn notif-bell-btn" id="ed-todo-btn" onclick="openTodoPanel()" title="TODOs in this file">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="19" height="19"><rect x="3" y="5" width="6" height="6" rx="1"/><path d="M13 8h8"/><rect x="3" y="15" width="6" height="6" rx="1"/><path d="M13 18h8"/></svg>
       <span class="notif-badge" id="todo-badge" style="display:none">0</span>
     </button>
@@ -104,20 +131,42 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><circle cx="12" cy="12" r="9"/><path d="M10 8l6 4-6 4V8z" fill="currentColor" stroke="none"/></svg>
     </button>
   </div>
+  <div id="ed-stats-bar" class="ed-stats-bar"></div>
   <div id="ed-readonly-banner" style="display:none;">🔒 Shared with you — read-only</div>
-  <div class="scroll" id="ed-content" style="padding-bottom:130px"></div>
   <div id="ftoolbar">
-    <button class="tb tb-fmt" onmousedown="event.preventDefault()" onclick="applyHighlight()" title="Highlight (Alt+H)">🖍</button>
-    <button class="tb tb-fmt" onmousedown="event.preventDefault()" onclick="applyBold()" title="Bold (Ctrl/Cmd+B)"><b>B</b></button>
-    <button class="tb tb-fmt" onmousedown="event.preventDefault()" onclick="applyItalic()" title="Italic (Ctrl/Cmd+I)"><i>I</i></button>
-    <button class="tb tb-fmt" onmousedown="event.preventDefault()" onclick="applyUnderline()" title="Underline (Ctrl/Cmd+U)"><u>U</u></button>
+    <button class="tb tb-fmt" id="tb-highlight" onmousedown="event.preventDefault()" onclick="applyHighlight()" title="Highlight (Alt+H)">🖍</button>
+    <button class="tb tb-fmt" id="tb-bold" onmousedown="event.preventDefault()" onclick="applyBold()" title="Bold (Ctrl/Cmd+B)"><b>B</b></button>
+    <button class="tb tb-fmt" id="tb-italic" onmousedown="event.preventDefault()" onclick="applyItalic()" title="Italic (Ctrl/Cmd+I)"><i>I</i></button>
+    <button class="tb tb-fmt" id="tb-underline" onmousedown="event.preventDefault()" onclick="applyUnderline()" title="Underline (Ctrl/Cmd+U)"><u>U</u></button>
+    <button class="tb tb-fmt" onmousedown="event.preventDefault()" onclick="openColorSwatches('color')" title="Text Color">🎨</button>
+    <button class="tb tb-fmt" onmousedown="event.preventDefault()" onclick="openColorSwatches('background-color')" title="Background Color">🖌</button>
     <button class="tb tb-fmt" onmousedown="event.preventDefault()" onclick="applyList()" title="List (Alt+L)">☰ List</button>
+    <button class="tb tb-fmt" id="tb-check" onmousedown="event.preventDefault()" onclick="tbToggleChecklist()" title="Checklist item">☑ Check</button>
+    <button class="tb tb-fmt" id="tb-h1" onmousedown="event.preventDefault()" onclick="applyHeading(1)" title="Heading 1">H1</button>
+    <button class="tb tb-fmt" id="tb-h2" onmousedown="event.preventDefault()" onclick="applyHeading(2)" title="Heading 2">H2</button>
+    <button class="tb tb-fmt" id="tb-h3" onmousedown="event.preventDefault()" onclick="applyHeading(3)" title="Heading 3">H3</button>
+    <button class="tb tb-fmt" onmousedown="event.preventDefault()" onclick="openInsertLink()" title="Add Link">🔗 Link</button>
+    <button class="tb" onclick="openImageFilePicker()" title="Insert image from device">🖼 Image</button>
+    <button class="tb" onclick="openAnchoredMenu('table-menu-ov',event)" title="Table actions">▦ Table ▾</button>
+    <button class="tb" onclick="openAnchoredMenu('code-menu-ov',event)" title="Code block actions">🧩 Code ▾</button>
     <button class="tb" onclick="tbNew()" title="Add empty note">＋ Item</button>
     <button class="tb" onclick="tbIndent()" title="Indent list item">⇥ Indent</button>
     <button class="tb" onclick="tbOutdent()" title="Outdent list item">⇤ Outdent</button>
     <button class="tb hi" onclick="tbCard()" title="Turn into Flashcard">⚡ + Card</button>
     <button class="tb danger" onclick="tbDel()" title="Delete item">✕ Del</button>
   </div>
+  <div id="ftoolbar-colors">
+    <button class="tb" onmousedown="event.preventDefault()" onclick="closeColorSwatches()" title="Back">←</button>
+    <button class="swatch" style="background:#f06080" onmousedown="event.preventDefault()" onclick="applySwatchColor('#f06080')" title="Red"></button>
+    <button class="swatch" style="background:#f0a040" onmousedown="event.preventDefault()" onclick="applySwatchColor('#f0a040')" title="Orange"></button>
+    <button class="swatch" style="background:#e0d060" onmousedown="event.preventDefault()" onclick="applySwatchColor('#e0d060')" title="Yellow"></button>
+    <button class="swatch" style="background:#2dd4a0" onmousedown="event.preventDefault()" onclick="applySwatchColor('#2dd4a0')" title="Green"></button>
+    <button class="swatch" style="background:#6d8fff" onmousedown="event.preventDefault()" onclick="applySwatchColor('#6d8fff')" title="Blue"></button>
+    <button class="swatch" style="background:#b080f5" onmousedown="event.preventDefault()" onclick="applySwatchColor('#b080f5')" title="Purple"></button>
+    <button class="swatch swatch-custom" onmousedown="event.preventDefault()" onclick="openCustomColorPicker()" title="Custom color">+</button>
+    <input type="color" id="custom-color-inp" onchange="applyCustomColor(this.value)">
+  </div>
+  <div class="scroll" id="ed-content"></div>
 </div>
 
 <div id="s-review" class="screen">
@@ -127,6 +176,24 @@
     </button>
     <div class="hdr-title">Recall Session</div>
     <div id="rv-ctr" style="font-size:11px;color:var(--t2);font-family:var(--mono);flex-shrink:0;"></div>
+    <div class="hdr-actions">
+      <span class="hdr-xp-ring" title="Daily XP goal">
+        <svg width="24" height="24" viewBox="0 0 24 24">
+          <circle cx="12" cy="12" r="9" fill="none" stroke="var(--border)" stroke-width="3"/>
+          <circle class="xp-ring-fg" cx="12" cy="12" r="9" fill="none" stroke="var(--acc2)" stroke-width="3" stroke-linecap="round" stroke-dasharray="56.5" stroke-dashoffset="56.5" transform="rotate(-90 12 12)"/>
+        </svg>
+        <span class="xp-ring-label">0</span>
+      </span>
+      <span class="hdr-badge hdr-streak-badge" title="Daily streak — tap for a boost" style="display:none;cursor:pointer" onclick="celebrateStreak()"><span class="streak-flame">🔥</span><span class="hdr-streak-num">0</span></span>
+      <span class="hdr-badge hdr-perfect-badge" title="Perfect streak" style="display:none">⚡<span class="hdr-perfect-num">0</span></span>
+      <button class="icon-btn notif-bell-btn" onclick="openNotifPanel()" title="Notifications">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+        <span class="notif-badge" style="display:none">0</span>
+      </button>
+      <button class="icon-btn profile-btn" onclick="openProfileOrAuth()" title="Sign In">
+        <span class="profile-btn-ico"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4.5 20c0-4.1 3.4-7 7.5-7s7.5 2.9 7.5 7"/></svg></span>
+      </button>
+    </div>
   </div>
   <div class="pbar"><div class="pfill" id="rv-prog" style="width:0%"></div></div>
   <div class="scroll" id="rv-content"></div>
@@ -136,6 +203,15 @@
   <div class="hdr">
     <div class="hdr-title">Search</div>
     <div class="hdr-actions">
+      <span class="hdr-xp-ring" title="Daily XP goal">
+        <svg width="24" height="24" viewBox="0 0 24 24">
+          <circle cx="12" cy="12" r="9" fill="none" stroke="var(--border)" stroke-width="3"/>
+          <circle class="xp-ring-fg" cx="12" cy="12" r="9" fill="none" stroke="var(--acc2)" stroke-width="3" stroke-linecap="round" stroke-dasharray="56.5" stroke-dashoffset="56.5" transform="rotate(-90 12 12)"/>
+        </svg>
+        <span class="xp-ring-label">0</span>
+      </span>
+      <span class="hdr-badge hdr-streak-badge" title="Daily streak — tap for a boost" style="display:none;cursor:pointer" onclick="celebrateStreak()"><span class="streak-flame">🔥</span><span class="hdr-streak-num">0</span></span>
+      <span class="hdr-badge hdr-perfect-badge" title="Perfect streak" style="display:none">⚡<span class="hdr-perfect-num">0</span></span>
       <button class="icon-btn notif-bell-btn" onclick="openNotifPanel()" title="Notifications">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
         <span class="notif-badge" style="display:none">0</span>
@@ -152,6 +228,35 @@
   </div>
 </div>
 
+<div id="s-analysis" class="screen">
+  <div class="hdr">
+    <div class="hdr-logo" style="font-size:14px;gap:8px;">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--acc)" stroke-width="2"><line x1="6" y1="20" x2="6" y2="14"/><line x1="12" y1="20" x2="12" y2="8"/><line x1="18" y1="20" x2="18" y2="4"/></svg>
+      Analysis
+    </div>
+    <div style="flex:1"></div>
+    <div class="hdr-actions">
+      <span class="hdr-xp-ring" title="Daily XP goal">
+        <svg width="24" height="24" viewBox="0 0 24 24">
+          <circle cx="12" cy="12" r="9" fill="none" stroke="var(--border)" stroke-width="3"/>
+          <circle class="xp-ring-fg" cx="12" cy="12" r="9" fill="none" stroke="var(--acc2)" stroke-width="3" stroke-linecap="round" stroke-dasharray="56.5" stroke-dashoffset="56.5" transform="rotate(-90 12 12)"/>
+        </svg>
+        <span class="xp-ring-label">0</span>
+      </span>
+      <span class="hdr-badge hdr-streak-badge" title="Daily streak — tap for a boost" style="display:none;cursor:pointer" onclick="celebrateStreak()"><span class="streak-flame">🔥</span><span class="hdr-streak-num">0</span></span>
+      <span class="hdr-badge hdr-perfect-badge" title="Perfect streak" style="display:none">⚡<span class="hdr-perfect-num">0</span></span>
+      <button class="icon-btn notif-bell-btn" onclick="openNotifPanel()" title="Notifications">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+        <span class="notif-badge" style="display:none">0</span>
+      </button>
+      <button class="icon-btn profile-btn" onclick="openProfileOrAuth()" title="Sign In">
+        <span class="profile-btn-ico"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4.5 20c0-4.1 3.4-7 7.5-7s7.5 2.9 7.5 7"/></svg></span>
+      </button>
+    </div>
+  </div>
+  <div class="scroll" id="analysis-scroll" style="padding-bottom:80px"></div>
+</div>
+
 <div id="s-sync" class="screen">
   <div class="hdr">
     <div class="hdr-logo" style="font-size:14px;gap:8px;">
@@ -160,6 +265,15 @@
     </div>
     <div style="flex:1"></div>
     <div class="hdr-actions">
+      <span class="hdr-xp-ring" title="Daily XP goal">
+        <svg width="24" height="24" viewBox="0 0 24 24">
+          <circle cx="12" cy="12" r="9" fill="none" stroke="var(--border)" stroke-width="3"/>
+          <circle class="xp-ring-fg" cx="12" cy="12" r="9" fill="none" stroke="var(--acc2)" stroke-width="3" stroke-linecap="round" stroke-dasharray="56.5" stroke-dashoffset="56.5" transform="rotate(-90 12 12)"/>
+        </svg>
+        <span class="xp-ring-label">0</span>
+      </span>
+      <span class="hdr-badge hdr-streak-badge" title="Daily streak — tap for a boost" style="display:none;cursor:pointer" onclick="celebrateStreak()"><span class="streak-flame">🔥</span><span class="hdr-streak-num">0</span></span>
+      <span class="hdr-badge hdr-perfect-badge" title="Perfect streak" style="display:none">⚡<span class="hdr-perfect-num">0</span></span>
       <button class="icon-btn notif-bell-btn" onclick="openNotifPanel()" title="Notifications">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
         <span class="notif-badge" style="display:none">0</span>
@@ -170,6 +284,26 @@
     </div>
   </div>
   <div class="scroll" style="padding-bottom:80px">
+    <div class="sync-section" id="profile-section">
+      <div class="sync-hdr">Profile</div>
+      <div class="sync-body">
+        <div class="auth-hero" style="margin-top:6px">
+          <div class="profile-avatar" id="profile-avatar-preview" onclick="document.getElementById('profile-avatar-input').click()" title="Change photo"><svg viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4.5 20c0-4.1 3.4-7 7.5-7s7.5 2.9 7.5 7"/></svg></div>
+          <input type="file" id="profile-avatar-input" accept="image/*" style="display:none" onchange="handleAvatarUpload(this)">
+          <div class="auth-sub">Tap the circle to change your photo</div>
+        </div>
+        <div class="field-wrap">
+          <span class="field-ico">👤</span>
+          <input class="sheet-inp with-ico" id="profile-name-inp" type="text" placeholder="Full Name"/>
+        </div>
+        <div class="field-wrap">
+          <span class="field-ico">✉️</span>
+          <input class="sheet-inp with-ico" id="profile-email-inp" type="email" disabled/>
+        </div>
+        <button class="sbtn primary auth-primary-btn" onclick="saveProfileName()">Save Changes</button>
+        <button class="sbtn danger" onclick="logOutFromProfile()">Log Out</button>
+      </div>
+    </div>
     <div class="sync-section">
       <div class="sync-hdr">Export Data (Save to File)</div>
       <div class="sync-body">
@@ -212,6 +346,18 @@
       <div class="sync-hdr">Notifications</div>
       <div class="sync-body" id="notif-status-row"></div>
     </div>
+    <div class="sync-section">
+      <div class="sync-hdr">Sound</div>
+      <div class="sync-body" id="sound-status-row"></div>
+    </div>
+    <div class="sync-section">
+      <div class="sync-hdr">TODOs</div>
+      <div class="sync-body" id="all-todos-status"></div>
+    </div>
+    <div class="sync-section">
+      <div class="sync-hdr">Tips</div>
+      <div class="sync-body" id="all-tips-status"></div>
+    </div>
     <div class="sync-section" id="app-lock-section" style="display:none">
       <div class="sync-hdr">App Lock</div>
       <div class="sync-body" id="app-lock-status"></div>
@@ -220,8 +366,8 @@
       <div class="sync-hdr">Garden</div>
       <div class="sync-body" id="sync-growth-section"></div>
     </div>
-    <div class="wf-guide">
-      <div class="wf-hdr">Keyboard Shortcuts</div>
+    <div class="wf-guide collapsed" id="kb-shortcuts-guide">
+      <div class="wf-hdr">Keyboard Shortcuts<button class="wf-toggle" onclick="toggleWfGuide('kb-shortcuts-guide')" title="Show/hide">▸</button></div>
       <div class="wf-body">
         <div class="wf-step"><div class="wf-n">⌨️</div><div><strong style="color:var(--text)">Ctrl/Cmd + S:</strong> Instantly sync your data to the cloud.</div></div>
         <div class="wf-step"><div class="wf-n">⌨️</div><div><strong style="color:var(--text)">Ctrl/Cmd + Z:</strong> Undo the last edit in the note editor.</div></div>
@@ -234,13 +380,18 @@
         <div class="wf-step"><div class="wf-n">⌨️</div><div><strong style="color:var(--text)">Alt + Enter:</strong> Insert a line break within the same item (e.g. stacked terminal commands).</div></div>
         <div class="wf-step"><div class="wf-n">⌨️</div><div><strong style="color:var(--text)">Backspace</strong> at the start of an empty item deletes it and merges back to the previous one.</div></div>
         <div class="wf-step"><div class="wf-n">⌨️</div><div><strong style="color:var(--text)">Alt + N:</strong> Jump straight to New Folder (Home) or New File (inside a folder).</div></div>
+        <div class="wf-step"><div class="wf-n">⌨️</div><div><strong style="color:var(--text)">/xml:</strong> Turn the current line into a dedicated XML code block.</div></div>
+        <div class="wf-step"><div class="wf-n">⌨️</div><div><strong style="color:var(--text)">/lin:</strong> Turn the current line into a dedicated shell/Linux command code block.</div></div>
+        <div class="wf-step"><div class="wf-n">⌨️</div><div><strong style="color:var(--text)">/sql:</strong> Turn the current line into a dedicated SQL code block.</div></div>
+        <div class="wf-step"><div class="wf-n">⌨️</div><div><strong style="color:var(--text)">Ctrl/Cmd + Enter</strong> (inside an /xml, /lin, or /sql block): add a new line below the block and continue the outline.</div></div>
+        <div class="wf-step"><div class="wf-n">⌨️</div><div><strong style="color:var(--text)">/tips:</strong> Turn the current line into a tip callout.</div></div>
         <div class="wf-step"><div class="wf-n">⌨️</div><div><strong style="color:var(--text)">Esc:</strong> Close the current popup, or back out one screen (folder → Home, editor → Home).</div></div>
         <div class="wf-step"><div class="wf-n">⌨️</div><div><strong style="color:var(--text)">Spacebar:</strong> Reveal the answer during a review session.</div></div>
         <div class="wf-step"><div class="wf-n">⌨️</div><div><strong style="color:var(--text)">1, 2, 3, 4, 5:</strong> Rate your memory recall quickly.</div></div>
       </div>
     </div>
-    <div class="wf-guide" style="margin-bottom:16px">
-      <div class="wf-hdr">Search Syntax</div>
+    <div class="wf-guide collapsed" id="search-syntax-guide" style="margin-bottom:16px">
+      <div class="wf-hdr">Search Syntax<button class="wf-toggle" onclick="toggleWfGuide('search-syntax-guide')" title="Show/hide">▸</button></div>
       <div class="wf-body">
         <div class="wf-step"><div class="wf-n">🔍</div><div><code>word</code> — content contains word (default)</div></div>
         <div class="wf-step"><div class="wf-n">🔍</div><div><code>a+b</code> — exact phrase "a b"</div></div>
@@ -269,6 +420,9 @@
   <button class="bnav-item" id="bn-review" onclick="reviewTab()" title="Review Cards">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
     <span class="nb-badge" id="rv-badge" style="display:none">0</span>Review
+  </button>
+  <button class="bnav-item" id="bn-analysis" onclick="switchTab('analysis')" title="Analysis">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="6" y1="20" x2="6" y2="14"/><line x1="12" y1="20" x2="12" y2="8"/><line x1="18" y1="20" x2="18" y2="4"/></svg>Analysis
   </button>
   <button class="bnav-item" id="bn-sync" onclick="switchTab('sync')" title="Settings & Sync">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="1 4 1 10 7 10"/><polyline points="23 20 23 14 17 14"/><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"/></svg>Sync
@@ -385,6 +539,46 @@
     <button class="sbtn ghost" onclick="closeNewDoc()">Cancel</button>
   </div>
 </div>
+
+<div class="overlay" id="table-menu-ov" data-close="closeTableMenu" onclick="if(event.target===this)closeTableMenu()">
+  <div class="sheet">
+    <button class="sbtn ghost" onclick="closeTableMenu();openInsertTable()">▦ Insert Table</button>
+    <button class="sbtn ghost" onclick="tableAddRow();closeTableMenu()">+ Row</button>
+    <button class="sbtn ghost" onclick="tableRemoveRow();closeTableMenu()">− Row</button>
+    <button class="sbtn ghost" onclick="tableAddCol();closeTableMenu()">+ Column</button>
+    <button class="sbtn ghost" onclick="tableRemoveCol();closeTableMenu()">− Column</button>
+  </div>
+</div>
+
+<div class="overlay" id="code-menu-ov" data-close="closeCodeMenu" onclick="if(event.target===this)closeCodeMenu()">
+  <div class="sheet">
+    <button class="sbtn ghost" onclick="tbCodeBlock('xml');closeCodeMenu()">🧩 XML</button>
+    <button class="sbtn ghost" onclick="tbCodeBlock('lin');closeCodeMenu()">💻 Shell</button>
+    <button class="sbtn ghost" onclick="tbCodeBlock('sql');closeCodeMenu()">🗄️ SQL</button>
+  </div>
+</div>
+
+<div class="overlay" id="table-insert-ov" data-close="closeInsertTable" onclick="if(event.target===this)closeInsertTable()">
+  <div class="sheet">
+    <div class="sheet-h">Insert Table</div>
+    <div class="table-dim-row">
+      <input class="sheet-inp" type="number" id="table-rows-inp" min="1" max="20" value="3" placeholder="Rows"/>
+      <input class="sheet-inp" type="number" id="table-cols-inp" min="1" max="10" value="3" placeholder="Columns"/>
+    </div>
+    <button class="sbtn primary" onclick="confirmInsertTable()">Insert Table</button>
+    <button class="sbtn ghost" onclick="closeInsertTable()">Cancel</button>
+  </div>
+</div>
+
+<div class="overlay" id="link-insert-ov" data-close="closeInsertLink" onclick="if(event.target===this)closeInsertLink()">
+  <div class="sheet">
+    <div class="sheet-h">Add Link</div>
+    <input class="sheet-inp" type="url" id="link-url-inp" placeholder="https://example.com" maxlength="2000" onkeydown="if(event.key==='Enter')confirmInsertLink()"/>
+    <button class="sbtn primary" onclick="confirmInsertLink()">Add Link</button>
+    <button class="sbtn ghost" onclick="closeInsertLink()">Cancel</button>
+  </div>
+</div>
+<input type="file" id="img-file-inp" accept="image/*" capture="environment" style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;" onchange="handleImageFileInsert(event)">
 
 <div class="overlay" id="rename-ov" data-close="closeRenameOv" onclick="if(event.target===this)closeRenameOv()">
   <div class="sheet">
@@ -526,6 +720,22 @@
   </div>
 </div>
 
+<div class="overlay" id="all-todos-ov" data-close="closeAllTodosPanel" onclick="if(event.target===this)closeAllTodosPanel()">
+  <div class="sheet todo-drawer">
+    <button class="sheet-close" onclick="closeAllTodosPanel()" title="Close" aria-label="Close">✕</button>
+    <div class="sheet-h">All TODOs</div>
+    <div class="notif-panel-list" id="all-todos-list"></div>
+  </div>
+</div>
+
+<div class="overlay" id="all-tips-ov" data-close="closeAllTipsPanel" onclick="if(event.target===this)closeAllTipsPanel()">
+  <div class="sheet todo-drawer">
+    <button class="sheet-close" onclick="closeAllTipsPanel()" title="Close" aria-label="Close">✕</button>
+    <div class="sheet-h">All Tips</div>
+    <div class="notif-panel-list" id="all-tips-list"></div>
+  </div>
+</div>
+
 <div class="overlay" id="pin-setup-ov" data-close="closePinSetup" onclick="if(event.target===this)closePinSetup()">
   <div class="sheet">
     <button class="sheet-close" onclick="closePinSetup()" title="Close" aria-label="Close">✕</button>
@@ -533,12 +743,13 @@
     <input class="sheet-inp" id="pin-setup-inp1" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="New PIN (4-6 digits)" onkeydown="if(event.key==='Enter')document.getElementById('pin-setup-inp2').focus()"/>
     <input class="sheet-inp" id="pin-setup-inp2" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="Confirm PIN" onkeydown="if(event.key==='Enter')confirmPinSetup()"/>
     <button class="sbtn primary" onclick="confirmPinSetup()">Save PIN</button>
+    <button class="sbtn ghost" onclick="closePinSetup()">Skip for now</button>
   </div>
 </div>
 
-<!-- Mandatory re-lock gate (Android only, PIN set) — no sheet-close/backdrop
-     dismiss, same non-dismissable pattern as notif-gate-ov. See
-     js/app-lock.js. -->
+<!-- Mandatory re-lock gate (web + Android, once a PIN is set) — no
+     sheet-close/backdrop dismiss, same non-dismissable pattern as
+     notif-gate-ov. See js/app-lock.js. -->
 <div class="overlay" id="app-lock-gate-ov">
   <div class="sheet auth-sheet">
     <div class="auth-hero">
@@ -553,28 +764,6 @@
   </div>
 </div>
 
-<div class="overlay" id="profile-ov" data-close="closeProfileMenu" onclick="if(event.target===this)closeProfileMenu()">
-  <div class="sheet auth-sheet">
-    <button class="sheet-close" onclick="closeProfileMenu()" title="Close" aria-label="Close">✕</button>
-    <div class="auth-hero">
-      <div class="profile-avatar" id="profile-avatar-preview" onclick="document.getElementById('profile-avatar-input').click()" title="Change photo"><svg viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4.5 20c0-4.1 3.4-7 7.5-7s7.5 2.9 7.5 7"/></svg></div>
-      <input type="file" id="profile-avatar-input" accept="image/*" style="display:none" onchange="handleAvatarUpload(this)">
-      <div class="sheet-h" style="margin-bottom:4px">Your Profile</div>
-      <div class="auth-sub">Tap the circle to change your photo</div>
-    </div>
-    <div class="field-wrap">
-      <span class="field-ico">👤</span>
-      <input class="sheet-inp with-ico" id="profile-name-inp" type="text" placeholder="Full Name"/>
-    </div>
-    <div class="field-wrap">
-      <span class="field-ico">✉️</span>
-      <input class="sheet-inp with-ico" id="profile-email-inp" type="email" disabled/>
-    </div>
-    <button class="sbtn primary auth-primary-btn" onclick="saveProfileName()">Save Changes</button>
-    <button class="sbtn danger" onclick="logOutFromProfile()">Log Out</button>
-  </div>
-</div>
-
 <div id="toast"></div>
 
 <!-- Vendored Capacitor browser bundles (see js/capacitor/). Harmless on the
@@ -586,13 +775,16 @@
 <script src="js/capacitor/local-notifications-plugin.js"></script>
 <script src="js/capacitor/app-plugin.js"></script>
 <script type="module" src="js/firebase-init.js"></script>
+<script type="module" src="js/xml-block.js"></script>
 <script src="js/app-core.js"></script>
+<script src="js/sound.js"></script>
 <script src="js/folder-context.js"></script>
 <script src="js/folder-share.js"></script>
 <script src="js/daily-tracker.js"></script>
 <script src="js/notifications.js"></script>
 <script src="js/achievements.js"></script>
 <script src="js/growth.js"></script>
+<script src="js/analysis.js"></script>
 <script src="js/app-lock.js"></script>
 <script src="js/backup.js"></script>
 <script src="js/image-editor.js"></script>

@@ -16,6 +16,15 @@
 // "Replace" in that already-existing, already-tested UI IS the rollback.
 const BACKUP_RETENTION_DAYS = 7;
 
+// Failures used to be console.error-only, so a persistent problem (offline,
+// rules mismatch, quota) looked identical from the user's side to "just
+// hasn't run yet" — the Sync tab's list stayed on "No backups yet" forever
+// with no indication anything had even been attempted. lastBackupError +
+// the toast below make a failed attempt visible; retrying on every Sync-tab
+// visit (see switchTab in app-core.js) gives it a natural retry path instead
+// of waiting a full day for the date guard to allow another attempt.
+let lastBackupError = null;
+
 async function runDailyBackup(){
   if(!D || !window.currentUser || !window.fb) return;
   const t = today();
@@ -28,10 +37,16 @@ async function runDailyBackup(){
       images: D.images || {}
     });
     D.lastBackupDate = t;
+    lastBackupError = null;
     saveLS();
     pruneOldBackups();
     renderBackupList();
-  }catch(e){ console.error('Daily backup failed', e); }
+  }catch(e){
+    console.error('Daily backup failed', e);
+    lastBackupError = e;
+    toast('⚠️ Today\'s backup failed — will retry next time you open Sync');
+    renderBackupList();
+  }
 }
 window.runDailyBackup = runDailyBackup;
 
@@ -56,6 +71,22 @@ async function pruneOldBackups(){
 }
 
 // ── Sync tab: list + per-date download ───────────────────────────────
+function backupStatusRow(){
+  if(lastBackupError){
+    return `<div class="sync-row">
+      <div class="sync-ico" style="background:#1a0d0d">⚠️</div>
+      <div class="sync-info"><strong>Today's backup failed</strong><span>Will retry automatically next time you open Sync</span></div>
+    </div>`;
+  }
+  if(D && D.lastBackupDate === today()){
+    return `<div class="sync-row">
+      <div class="sync-ico" style="background:#0d1a0d">✅</div>
+      <div class="sync-info"><strong>Backed up today</strong><span>Last snapshot: ${esc(today())}</span></div>
+    </div>`;
+  }
+  return '';
+}
+
 async function renderBackupList(){
   const el = document.getElementById('backup-list');
   if(!el || !window.currentUser || !window.fb) return;
@@ -64,13 +95,13 @@ async function renderBackupList(){
     const snap = await window.fb.getDocs(window.fb.collection(window.db,'users',window.currentUser.uid,'backups'));
     const backups = snap.docs.map(d=>({date:d.id, ...d.data()})).sort((a,b)=>b.date.localeCompare(a.date));
     if(!backups.length){
-      el.innerHTML = `<div class="sync-row">
+      el.innerHTML = backupStatusRow() + `<div class="sync-row">
         <div class="sync-ico" style="background:#1a1a0d">🗄️</div>
         <div class="sync-info"><strong>No backups yet</strong><span>One is taken automatically each day you use the app</span></div>
       </div>`;
       return;
     }
-    el.innerHTML = backups.map(b=>{
+    el.innerHTML = backupStatusRow() + backups.map(b=>{
       const cardCount = (b.documents||[]).reduce((n,d)=>n+(d.items||[]).filter(i=>i.srs).length,0);
       const dateLabel = new Date(b.date+'T00:00:00').toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric'});
       return `<div class="sync-row">

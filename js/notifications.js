@@ -35,6 +35,10 @@ const STREAK_HOUR = 21;     // 9pm local streak-warning check
 
 let adhocNotifId = ADHOC_ID_BASE;
 
+// opts: {channelId, actionTypeId} — both optional, native-only. Every
+// existing caller keeps working unchanged (defaults to the 'nv_default'
+// channel, no action buttons); only promptIncomingFolderShare() currently
+// passes channelId:'nv_share'.
 function notifyUser(title, body, opts={}){
   if(isNative()){
     const plugin = LN();
@@ -44,7 +48,9 @@ function notifyUser(title, body, opts={}){
       id: adhocNotifId,
       title, body,
       schedule: { at: new Date(Date.now() + 300) },
-      smallIcon: 'ic_stat_notify'
+      smallIcon: 'ic_stat_notify',
+      channelId: opts.channelId || 'nv_default',
+      ...(opts.actionTypeId ? {actionTypeId: opts.actionTypeId} : {})
     }] }).catch(e=>console.error('Native notification failed', e));
     return;
   }
@@ -155,7 +161,7 @@ window.recheckNotifyGate = recheckNotifyGate;
 // action (optional) lets a notification carry a resolvable task — currently
 // only folder-share invites use it, rendered as Accept/Reject buttons by
 // renderNotifPanel() below and resolved via resolveNotifShareInvite().
-function pushNotification(icon, title, body, action){
+function pushNotification(icon, title, body, action, opts={}){
   if(!D) return;
   if(!Array.isArray(D.notifications)) D.notifications = [];
   D.notifications.unshift({ id: gid(), icon, title, body, ts: new Date().toISOString(), read: false, action: action||null });
@@ -163,7 +169,7 @@ function pushNotification(icon, title, body, action){
   saveLS();
   renderNotificationBell();
   if(document.getElementById('notif-panel-ov')?.classList.contains('open')) renderNotifPanel();
-  notifyUser(`${icon} ${title}`, body);
+  notifyUser(`${icon} ${title}`, body, opts);
 }
 window.pushNotification = pushNotification;
 
@@ -386,22 +392,51 @@ async function scheduleRecurringReminders(){
 }
 window.scheduleRecurringReminders = scheduleRecurringReminders;
 
+// Android 8+ ties notification sound to a Notification Channel property, not
+// a per-notification field — a channel is created once and referenced by
+// channelId on every .schedule() call after that (per-notification `sound`
+// only works on Android <8, effectively no real device). nv_default covers
+// every existing caller (achievements, growth, goal-complete, reminders);
+// nv_share is the deliberately distinct sound for incoming folder-share
+// invites. Channel sounds are immutable per device once created — if
+// nv_default.wav/nv_share.wav (scripts/gen-notification-sounds.js) ever need
+// to change, that requires a new channel id, not editing this one.
+async function ensureNotificationChannels(){
+  const plugin = LN();
+  if(!plugin || !plugin.createChannel) return;
+  try{
+    await plugin.createChannel({ id:'nv_default', name:'NoteVault', description:'Achievements, growth, and daily-goal notifications', sound:'nv_default.wav', importance:5, visibility:1 });
+    await plugin.createChannel({ id:'nv_share', name:'Folder Shares', description:'Incoming folder-share invites', sound:'nv_share.wav', importance:5, visibility:1 });
+  }catch(e){ console.error('Notification channel setup failed', e); }
+}
+
 // Quick actions on the reminder notification itself — "Review Now" jumps
 // straight into the review session, "Snooze 1h" reschedules a one-off copy
-// without touching the recurring daily slot.
+// without touching the recurring daily slot. OPEN_ACTION is a separate,
+// simpler type (a single "Open" button, explicitly no snooze) used by
+// ad-hoc notifications like folder-share invites — unrelated to TASK_ACTIONS,
+// which stays exactly as-is for the daily reminders.
 function registerNotifActionHandlers(){
   const plugin = LN();
   if(!plugin || window.__nvActionsRegistered) return;
   window.__nvActionsRegistered = true;
 
   plugin.registerActionTypes({
-    types: [{
-      id: 'TASK_ACTIONS',
-      actions: [
-        { id: 'review', title: 'Review Now' },
-        { id: 'snooze', title: 'Snooze 1h' }
-      ]
-    }]
+    types: [
+      {
+        id: 'TASK_ACTIONS',
+        actions: [
+          { id: 'review', title: 'Review Now' },
+          { id: 'snooze', title: 'Snooze 1h' }
+        ]
+      },
+      {
+        id: 'OPEN_ACTION',
+        actions: [
+          { id: 'open', title: 'Open' }
+        ]
+      }
+    ]
   });
 
   plugin.addListener('localNotificationActionPerformed', async e => {
@@ -433,7 +468,7 @@ async function initNotifications(){
   if(!D) return;
   renderNotificationBell();
 
-  if(isNative()) registerNotifActionHandlers();
+  if(isNative()){ registerNotifActionHandlers(); ensureNotificationChannels(); }
 
   const granted = await openNotifGateIfNeeded();
   renderNotificationSettings();

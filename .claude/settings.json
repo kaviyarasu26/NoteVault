@@ -1,0 +1,28 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node -e ' *)",
+      "Bash(node --check js/image-editor.js)",
+      "Bash(node --check js/xml-block.js)",
+      "Bash(node -e \"console.log\\(process.version\\)\")",
+      "Bash(curl -sv http://127.0.0.1:8791/index.html)",
+      "Bash(curl -sf http://127.0.0.1:8791/index.html)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://127.0.0.1:8791/index.html)",
+      "Bash(lsof -ti:8791 -sTCP:LISTEN)",
+      "Bash(xargs -r kill)",
+      "Bash(taskkill //F //PID 25960)",
+      "Bash(command -v chromium-cli)",
+      "Bash(where.exe chromium-cli *)",
+      "Bash(npm ls *)",
+      "Bash(npx --yes playwright --version)",
+      "Bash(ls /c/Users/kavia/Documents/GitHub/NoteVault/node_modules/ 2>&1 | head -20 *)",
+      "Read(//c//**)",
+      "Bash(taskkill //F //IM find.exe)",
+      "Bash(node \"C:\\\\Users\\\\kavia\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-kavia-Documents-GitHub-NoteVault\\\\65076e25-7db0-46fe-b4c9-b964aca082da\\\\scratchpad\\\\smoke-test.js\")",
+      "Bash(NODE_PATH=\"/c/Users/kavia/Documents/GitHub/NoteVault/node_modules\" node \"C:\\\\Users\\\\kavia\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-kavia-Documents-GitHub-NoteVault\\\\65076e25-7db0-46fe-b4c9-b964aca082da\\\\scratchpad\\\\smoke-test.js\")",
+      "Bash(NODE_PATH=\"/c/Users/kavia/Documents/GitHub/NoteVault/node_modules\" node \"C:\\\\Users\\\\kavia\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-kavia-Documents-GitHub-NoteVault\\\\65076e25-7db0-46fe-b4c9-b964aca082da\\\\scratchpad\\\\smoke-test2.js\")",
+      "Bash(NODE_PATH=\"/c/Users/kavia/Documents/GitHub/NoteVault/node_modules\" node \"C:\\\\Users\\\\kavia\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-kavia-Documents-GitHub-NoteVault\\\\65076e25-7db0-46fe-b4c9-b964aca082da\\\\scratchpad\\\\smoke-test3.js\")",
+      "Bash(NODE_PATH=\"/c/Users/kavia/Documents/GitHub/NoteVault/node_modules\" node \"C:\\\\Users\\\\kavia\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-kavia-Documents-GitHub-NoteVault\\\\65076e25-7db0-46fe-b4c9-b964aca082da\\\\scratchpad\\\\smoke-test5.js\")"
+    ]
+  }
+}
